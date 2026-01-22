@@ -178,12 +178,69 @@
       font-weight: var(--font-weight-medium);
       line-height: 1.5;
     }
-    button,
-    input,
-    label {
-      font-size: 1rem;
-      font-weight: var(--font-weight-medium);
-      line-height: 1.5;
-    }
+  button,
+  input,
+  label {
+    font-size: 1rem;
+    font-weight: var(--font-weight-medium);
+    line-height: 1.5;
   }
+}
+
+/* Census map popup */
+.popup-census-wrapper .maplibregl-popup-content {
+  padding: 0.75rem 1rem;
+  min-width: 12rem;
+  font-size: 0.875rem;
+}
+.popup-census__title {
+  font-weight: 600;
+  margin-bottom: 0.5rem;
+  color: oklch(0.145 0 0);
+}
+.popup-census__risk {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  margin-bottom: 0.5rem;
+}
+.popup-census__badge {
+  padding: 0.125rem 0.5rem;
+  border-radius: 9999px;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+.popup-census__badge--risk-high {
+  background: #fed7aa;
+  color: #9a3412;
+}
+.popup-census__badge--risk-low {
+  background: #bfdbfe;
+  color: #1e40af;
+}
+.popup-census__badge--risk-neutral {
+  background: #e2e8f0;
+  color: #475569;
+}
+.popup-census__vuln {
+  color: oklch(0.556 0 0);
+  font-size: 0.75rem;
+}
+.popup-census__dl {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 0.25rem 1rem;
+  margin: 0;
+}
+.popup-census__dl dt {
+  margin: 0;
+  color: oklch(0.556 0 0);
+  font-weight: 500;
+}
+.popup-census__dl dd {
+  margin: 0;
+  text-align: right;
+  font-weight: 500;
+}
 }

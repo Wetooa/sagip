@@ -132,6 +132,8 @@ def load_geojson_file(geojson_path: Path) -> Dict[str, Any]:
     
     This function loads a GeoJSON file that was previously converted from a shapefile.
     Pre-converted files are faster to load than on-demand conversion.
+    Handles multiple encodings (UTF-8, Latin-1, Windows-1252) to support files
+    with different character encodings.
     
     Args:
         geojson_path: Path to the GeoJSON file (.geojson)
@@ -142,7 +144,7 @@ def load_geojson_file(geojson_path: Path) -> Dict[str, Any]:
     Raises:
         FileNotFoundError: If the GeoJSON file doesn't exist
         json.JSONDecodeError: If the file contains invalid JSON
-        IOError: If the file cannot be read
+        IOError: If the file cannot be read with any supported encoding
         
     Example:
         >>> geojson_path = Path("data/noah/NOAH Downloads/Flood/5yr/Cebu/PH072200000_FH_5yr.geojson")
@@ -152,21 +154,38 @@ def load_geojson_file(geojson_path: Path) -> Dict[str, Any]:
     if not geojson_path.exists():
         raise FileNotFoundError(f"GeoJSON file not found: {geojson_path}")
     
-    try:
-        with open(geojson_path, 'r', encoding='utf-8') as f:
-            geojson = json.load(f)
-        
-        # Validate it's a FeatureCollection
-        if geojson.get('type') != 'FeatureCollection':
-            raise ValueError(f"Invalid GeoJSON type: expected FeatureCollection, got {geojson.get('type')}")
-        
-        return geojson
-    except json.JSONDecodeError as e:
-        logger.error(f"Invalid JSON in {geojson_path}: {e}")
-        raise
-    except Exception as e:
-        logger.error(f"Error loading GeoJSON file {geojson_path}: {e}")
-        raise
+    # Try multiple encodings in order of likelihood
+    encodings = ['utf-8', 'latin-1', 'cp1252', 'iso-8859-1', 'utf-8-sig']
+    
+    last_error = None
+    for encoding in encodings:
+        try:
+            with open(geojson_path, 'r', encoding=encoding) as f:
+                geojson = json.load(f)
+            
+            # Validate it's a FeatureCollection
+            if geojson.get('type') != 'FeatureCollection':
+                raise ValueError(f"Invalid GeoJSON type: expected FeatureCollection, got {geojson.get('type')}")
+            
+            logger.debug(f"Successfully loaded GeoJSON file {geojson_path} with encoding {encoding}")
+            return geojson
+        except UnicodeDecodeError as e:
+            last_error = e
+            logger.debug(f"Failed to decode {geojson_path} with encoding {encoding}: {e}")
+            continue
+        except json.JSONDecodeError as e:
+            logger.error(f"Invalid JSON in {geojson_path} (encoding {encoding}): {e}")
+            raise
+        except Exception as e:
+            # If it's not an encoding error, re-raise immediately
+            if not isinstance(e, UnicodeDecodeError):
+                logger.error(f"Error loading GeoJSON file {geojson_path}: {e}")
+                raise
+            last_error = e
+    
+    # If all encodings failed, raise the last error
+    logger.error(f"Failed to load GeoJSON file {geojson_path} with any supported encoding. Last error: {last_error}")
+    raise IOError(f"Could not decode {geojson_path} with any supported encoding (tried: {', '.join(encodings)}). Last error: {last_error}")
 
 
 def find_shapefile_path(
@@ -183,10 +202,11 @@ def find_shapefile_path(
     
     Args:
         base_path: Base path to NOAH data directory (e.g., 'data/noah')
-        hazard_type: Type of hazard - 'flood' or 'storm_surge'
+        hazard_type: Type of hazard - 'flood', 'storm_surge', or 'landslide'
         period_or_advisory: 
             - For flood: Return period string (e.g., '5yr', '25yr', '100yr')
             - For storm surge: Advisory level string (e.g., '1', '2', '3', '4')
+            - For landslide: Not used (can be empty string or None)
         province: Optional province name (e.g., 'Cebu', 'Palawan'). If None,
                  returns the first shapefile found in the period/advisory directory.
         
@@ -200,6 +220,9 @@ def find_shapefile_path(
         
         For storm surge data:
         - NOAH Downloads/Storm Surge/StormSurgeAdvisory{level}/{Province}_*.shp
+        
+        For landslide data:
+        - NOAH Downloads/Landslide/**/*.shp (various structures)
         
     Example:
         >>> base_path = Path("data/noah")
@@ -289,6 +312,34 @@ def find_shapefile_path(
             if shp_files:
                 return shp_files[0]
     
+    elif hazard_type == "landslide":
+        # Landslide: NOAH Downloads/Landslide/**/*.shp
+        landslide_dir = base_path / "NOAH Downloads" / "Landslide"
+        if not landslide_dir.exists():
+            return None
+        
+        if province:
+            # Try to find province-specific shapefile
+            province_normalized = province.replace(" ", "_")
+            
+            # Search recursively for shapefiles with province name in path or filename
+            for shp_file in landslide_dir.rglob("*.shp"):
+                filename_lower = shp_file.stem.lower()
+                path_lower = str(shp_file).lower()
+                province_lower = province.lower()
+                
+                # Check if province name appears in filename or path
+                if (province_lower in filename_lower or 
+                    province_lower in path_lower or
+                    province_lower.replace(" ", "_") in filename_lower or
+                    province_lower.replace(" ", "_") in path_lower):
+                    return shp_file
+        else:
+            # Return first shapefile found in landslide directory
+            shp_files = list(landslide_dir.rglob("*.shp"))
+            if shp_files:
+                return shp_files[0]
+    
     return None
 
 
@@ -296,27 +347,25 @@ def process_shapefile(
     shapefile_path: Path,
     normalize: bool = True,
     fix_geometry: bool = True,
-    use_preconverted: bool = True
+    use_preconverted: bool = False
 ) -> Dict[str, Any]:
     """
-    Process shapefile and convert to GeoJSON FeatureCollection.
+    Process shapefile and convert to GeoJSON FeatureCollection on-demand.
     
-    This function first checks for a pre-converted GeoJSON file (faster), and if
-    not found, converts the shapefile on-demand using geopandas. The processing
+    This function converts the shapefile to GeoJSON using geopandas. The processing
     pipeline includes geometry fixing and property normalization.
     
     Processing steps:
-    1. Check for pre-converted GeoJSON file (if use_preconverted=True)
-    2. If not found, read shapefile using geopandas
-    3. Convert to GeoJSON format
-    4. Fix polygon geometries (ensure rings are closed)
-    5. Normalize properties (standardize depth/hazard level fields)
+    1. Read shapefile using geopandas
+    2. Convert to GeoJSON format
+    3. Fix polygon geometries (ensure rings are closed)
+    4. Normalize properties (standardize depth/hazard level fields)
     
     Args:
         shapefile_path: Path to shapefile (.shp file)
         normalize: Whether to normalize property names (default: True)
         fix_geometry: Whether to fix polygon geometry issues (default: True)
-        use_preconverted: If True, check for pre-converted .geojson file first (default: True)
+        use_preconverted: Deprecated parameter (kept for backward compatibility, but ignored)
         
     Returns:
         GeoJSON FeatureCollection dictionary with structure:
@@ -338,9 +387,9 @@ def process_shapefile(
         Exception: For other processing errors
         
     Note:
-        Pre-converted GeoJSON files are expected to be in the same directory as
-        the shapefile with a .geojson extension (e.g., file.shp -> file.geojson).
-        Pre-converted files are faster to load and reduce server load.
+        This function converts shapefiles to GeoJSON on-demand. Results are cached
+        in memory for subsequent requests. Pre-converted GeoJSON files are not
+        checked by default to keep the codebase simple and avoid duplicate storage.
         
     Example:
         >>> shp_path = Path("data/noah/NOAH Downloads/Flood/5yr/Cebu/PH072200000_FH_5yr.shp")
@@ -351,27 +400,6 @@ def process_shapefile(
     
     if not shapefile_path.exists():
         raise FileNotFoundError(f"Shapefile not found: {shapefile_path}")
-    
-    # Check for pre-converted GeoJSON file first
-    if use_preconverted:
-        geojson_path = shapefile_path.with_suffix('.geojson')
-        if geojson_path.exists():
-            logger.debug(f"Loading pre-converted GeoJSON: {geojson_path}")
-            try:
-                geojson = load_geojson_file(geojson_path)
-                # Still apply processing if needed (though pre-converted should already be processed)
-                if "features" in geojson and (normalize or fix_geometry):
-                    processed_features = []
-                    for feature in geojson["features"]:
-                        if fix_geometry:
-                            feature = fix_polygon_geometry(feature)
-                        if normalize:
-                            feature["properties"] = normalize_properties(feature)
-                        processed_features.append(feature)
-                    geojson["features"] = processed_features
-                return geojson
-            except Exception as e:
-                logger.warning(f"Failed to load pre-converted GeoJSON {geojson_path}: {e}. Falling back to on-demand conversion.")
     
     # On-demand conversion from shapefile
     try:
@@ -425,6 +453,9 @@ def get_available_maps(base_path: Path) -> Dict[str, Any]:
                 "1": [{"province": "Cebu", "file": "..."}, ...],
                 "2": [...],
                 ...
+            },
+            "landslide": {
+                "all": [{"province": "Cebu", "file": "..."}, ...]
             }
         }
         
@@ -440,7 +471,8 @@ def get_available_maps(base_path: Path) -> Dict[str, Any]:
     base_path = Path(base_path)
     available = {
         "flood": {},
-        "storm_surge": {}
+        "storm_surge": {},
+        "landslide": {}
     }
     
     # Scan flood data
@@ -479,5 +511,35 @@ def get_available_maps(base_path: Path) -> Dict[str, Any]:
                         "province": province,
                         "file": str(shp_file.relative_to(base_path))
                     })
+    
+    # Scan landslide data
+    landslide_base = base_path / "NOAH Downloads" / "Landslide"
+    if landslide_base.exists():
+        available["landslide"]["all"] = []
+        
+        # Find all shapefiles in landslide directory
+        shp_files = list(landslide_base.rglob("*.shp"))
+        for shp_file in shp_files:
+            # Try to extract province name from filename or path
+            # Landslide files may have various naming conventions
+            stem = shp_file.stem
+            path_parts = shp_file.parts
+            
+            # Try to find province in filename or parent directory names
+            province = "Unknown"
+            for part in path_parts:
+                # Common province patterns
+                if any(p in part for p in ["Cebu", "Manila", "Palawan", "Mindanao", "Luzon", "Visayas"]):
+                    province = part
+                    break
+            
+            # Fallback: use first part of filename if no province found
+            if province == "Unknown" and "_" in stem:
+                province = stem.split("_")[0]
+            
+            available["landslide"]["all"].append({
+                "province": province,
+                "file": str(shp_file.relative_to(base_path))
+            })
     
     return available
