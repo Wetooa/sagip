@@ -6,7 +6,7 @@ from passlib.context import CryptContext
 from fastapi import Depends, HTTPException, status, Request
 from fastapi.security import OAuth2PasswordBearer, HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.orm import Session
-import bcrypt
+import bcrypt as bcrypt_lib
 
 from app.core.config import settings
 from app.core.database import get_db
@@ -14,18 +14,11 @@ from app.models.citizen import Citizen
 
 # Password hashing context
 # Initialize with workaround for bcrypt version detection issues
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
-# Suppress bcrypt version detection errors by setting backend explicitly
-try:
-    import passlib.handlers.bcrypt as bcrypt_handler
-    # Try to set backend to avoid detection issues
-    if hasattr(bcrypt_handler, 'set_backend'):
-        try:
-            bcrypt_handler.set_backend('bcrypt', dryrun=True)
-        except:
-            pass
-except:
-    pass
+# The version detection warning can be ignored - we use direct bcrypt for hashing
+import warnings
+with warnings.catch_warnings():
+    warnings.filterwarnings("ignore", category=UserWarning)
+    pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 # OAuth2 scheme
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl=f"{settings.API_PREFIX}/auth/login", auto_error=False)
@@ -35,14 +28,18 @@ optional_bearer = HTTPBearer(auto_error=False)
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
     """Verify a password against its hash."""
-    if pwd_context is None:
-        # Fallback to direct bcrypt
-        return bcrypt.checkpw(plain_password.encode('utf-8'), hashed_password.encode('utf-8'))
-    return pwd_context.verify(plain_password, hashed_password)
+    try:
+        return pwd_context.verify(plain_password, hashed_password)
+    except Exception:
+        # Fallback to direct bcrypt if passlib fails
+        try:
+            return bcrypt_lib.checkpw(plain_password.encode('utf-8'), hashed_password.encode('utf-8'))
+        except Exception:
+            return False
 
 
 def get_password_hash(password: str) -> str:
-    """Hash a password."""
+    """Hash a password with workaround for bcrypt 72-byte limit and version detection."""
     # Ensure password is a string and within bcrypt's 72-byte limit
     if not isinstance(password, str):
         password = str(password)
@@ -51,21 +48,13 @@ def get_password_hash(password: str) -> str:
     password_bytes = password.encode('utf-8')
     if len(password_bytes) > 72:
         password = password_bytes[:72].decode('utf-8', errors='ignore')
-        password_bytes = password.encode('utf-8')
     
-    if pwd_context is None:
-        # Fallback to direct bcrypt to avoid passlib backend detection issues
-        salt = bcrypt.gensalt()
-        hashed = bcrypt.hashpw(password_bytes, salt)
-        return hashed.decode('utf-8')
-    
-    try:
-        return pwd_context.hash(password)
-    except (ValueError, AttributeError) as e:
-        # If passlib fails, use direct bcrypt
-        salt = bcrypt.gensalt()
-        hashed = bcrypt.hashpw(password_bytes, salt)
-        return hashed.decode('utf-8')
+    # Use direct bcrypt to avoid passlib's backend detection issues
+    # This bypasses the problematic version detection that causes errors
+    salt = bcrypt_lib.gensalt()
+    hashed = bcrypt_lib.hashpw(password.encode('utf-8'), salt)
+    # Return in passlib-compatible format (bcrypt hash string)
+    return hashed.decode('utf-8')
 
 
 def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -> str:

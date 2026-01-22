@@ -16,6 +16,7 @@ export default function FloodMap({ className }: FloodMapProps) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [geoJsonData, setGeoJsonData] = useState<FloodGeoJSON | null>(null);
+  const [censusData, setCensusData] = useState<FloodGeoJSON | null>(null);
 
   useEffect(() => {
     if (!mapContainer.current) return;
@@ -64,7 +65,7 @@ export default function FloodMap({ className }: FloodMapProps) {
 
       // Add the GeoJSON source
       if (map.current.getSource('flood-hazard')) {
-        (map.current.getSource('flood-hazard') as maplibregl.GeoJSONSource).setData(data);
+        (map.current.getSource('flood-hazard') as maplibregl.GeoJSONSource).setData(data as any);
       } else {
         map.current.addSource('flood-hazard', {
           type: 'geojson',
@@ -158,6 +159,161 @@ export default function FloodMap({ className }: FloodMapProps) {
       setLoading(false);
     };
 
+    // Function to add census data to map
+    const addCensusDataToMap = (data: FloodGeoJSON) => {
+      if (!map.current) return;
+
+      // Check if map is loaded
+      if (!map.current.loaded()) {
+        map.current.once('load', () => addCensusDataToMap(data));
+        return;
+      }
+
+      // Add the GeoJSON source
+      if (map.current.getSource('census-data')) {
+        (map.current.getSource('census-data') as maplibregl.GeoJSONSource).setData(data as any);
+      } else {
+        map.current.addSource('census-data', {
+          type: 'geojson',
+          data: data as any,
+          generateId: true  // Ensure features have IDs for feature state
+        });
+
+        // Add fill layer for census data with hover state support
+        map.current.addLayer({
+          id: 'census-fill',
+          type: 'fill',
+          source: 'census-data',
+          paint: {
+            'fill-color': [
+              'case',
+              // Check hover state first
+              ['boolean', ['feature-state', 'hover'], false],
+              [
+                'case',
+                ['==', ['get', 'risk_status'], 1],
+                '#ff6f00',  // Brighter orange when hovering (risk_status = 1)
+                '#66bb6a'   // Brighter green when hovering (risk_status = 0)
+              ],
+              // Default colors when not hovering
+              [
+                'case',
+                ['==', ['get', 'risk_status'], 1],
+                '#ff9800',  // Orange/red for risk_status = 1
+                '#4caf50'   // Green for risk_status = 0
+              ]
+            ],
+            'fill-opacity': [
+              'case',
+              ['boolean', ['feature-state', 'hover'], false],
+              0.7,  // More opaque when hovering
+              0.4   // Default opacity
+            ],
+            'fill-outline-color': [
+              'case',
+              // Check hover state first
+              ['boolean', ['feature-state', 'hover'], false],
+              [
+                'case',
+                ['==', ['get', 'risk_status'], 1],
+                '#bf360c',  // Darker orange outline when hovering
+                '#1b5e20'   // Darker green outline when hovering
+              ],
+              // Default outline colors
+              [
+                'case',
+                ['==', ['get', 'risk_status'], 1],
+                '#e65100',  // Darker orange for outline
+                '#2e7d32'   // Darker green for outline
+              ]
+            ]
+          }
+        });
+
+        // Add click handler for popups
+        map.current.on('click', 'census-fill', (e) => {
+          if (!map.current || !e.features || e.features.length === 0) return;
+
+          const feature = e.features[0];
+          const properties = feature.properties || {};
+
+          // Format popup content with census properties
+          const popupContent = `
+            <div style="font-family: sans-serif;">
+              <strong>Census Data</strong><br/>
+              <strong>Total Population:</strong> ${properties.total_pop?.toFixed(2) || 'N/A'}<br/>
+              <strong>Elderly Count:</strong> ${properties.elderly_count?.toFixed(2) || 'N/A'}<br/>
+              <strong>Stories:</strong> ${properties.stories || 'N/A'}<br/>
+              <strong>Risk Status:</strong> ${properties.risk_status === 1 ? 'At Risk' : 'No Risk'}
+            </div>
+          `;
+
+          new maplibregl.Popup()
+            .setLngLat(e.lngLat)
+            .setHTML(popupContent)
+            .addTo(map.current);
+        });
+
+        // Track currently hovered feature
+        let hoveredFeatureId: number | string | null = null;
+
+        // Change cursor and highlight feature on hover
+        map.current.on('mouseenter', 'census-fill', (e) => {
+          if (map.current && e.features && e.features.length > 0) {
+            map.current.getCanvas().style.cursor = 'pointer';
+            
+            // Reset previously hovered feature
+            if (hoveredFeatureId !== null) {
+              try {
+                map.current.setFeatureState(
+                  { source: 'census-data', id: hoveredFeatureId },
+                  { hover: false }
+                );
+              } catch (err) {
+                // Feature might have been removed or ID changed, ignore
+                console.debug('Could not reset hover state:', err);
+              }
+            }
+            
+            // Set hover state for current feature
+            const feature = e.features[0];
+            // Use feature.id if available, otherwise try to use a unique property or index
+            hoveredFeatureId = feature.id !== undefined && feature.id !== null 
+              ? feature.id 
+              : feature.properties?.id || null;
+            
+            if (hoveredFeatureId !== null) {
+              try {
+                map.current.setFeatureState(
+                  { source: 'census-data', id: hoveredFeatureId },
+                  { hover: true }
+                );
+              } catch (err) {
+                // If setFeatureState fails, the feature might not have a valid ID
+                // In that case, we'll just change the cursor but not the color
+                console.debug('Could not set hover state, feature may not have ID:', err);
+              }
+            }
+          }
+        });
+
+        map.current.on('mouseleave', 'census-fill', () => {
+          if (map.current) {
+            map.current.getCanvas().style.cursor = '';
+            
+            // Reset hover state
+            if (hoveredFeatureId !== null) {
+              map.current.setFeatureState(
+                { source: 'census-data', id: hoveredFeatureId },
+                { hover: false }
+              );
+              hoveredFeatureId = null;
+            }
+          }
+        });
+      }
+    };
+
     // Fetch flood data
     const fetchFloodData = async () => {
       try {
@@ -178,7 +334,27 @@ export default function FloodMap({ className }: FloodMapProps) {
       }
     };
 
+    // Fetch census data
+    const fetchCensusData = async () => {
+      try {
+        const response = await fetch('/api/census-data');
+        
+        if (!response.ok) {
+          throw new Error(`Failed to fetch census data: ${response.statusText}`);
+        }
+
+        const data: FloodGeoJSON = await response.json();
+        setCensusData(data);
+        addCensusDataToMap(data);
+      } catch (err: any) {
+        console.error('Error fetching census data:', err);
+        // Don't set error state for census data, just log it
+        // This allows the flood data to still display if census fails
+      }
+    };
+
     fetchFloodData();
+    fetchCensusData();
 
     // Cleanup
     return () => {

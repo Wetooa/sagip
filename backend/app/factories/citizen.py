@@ -49,7 +49,13 @@ class CensusDataFactory(BaseFactory):
     address = factory.LazyAttribute(lambda obj: fake.street_address())
     barangay = factory.LazyAttribute(lambda obj: fake.city_suffix() + " " + fake.word().title())
     city = factory.LazyAttribute(lambda obj: fake.city())
-    province = factory.LazyAttribute(lambda obj: fake.state())
+    province = factory.LazyAttribute(
+        lambda obj: fake.random_element(elements=[
+            "Metro Manila", "Cebu", "Davao", "Laguna", "Cavite", "Rizal", 
+            "Bulacan", "Pampanga", "Batangas", "Quezon", "Negros Occidental",
+            "Iloilo", "Zamboanga del Sur", "Palawan", "Bohol"
+        ])
+    )
     additional_info = factory.LazyAttribute(
         lambda obj: {
             "emergency_contact": get_philippine_phone(),
