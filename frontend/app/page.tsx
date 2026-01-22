@@ -1,7 +1,7 @@
 "use client";
 
 import { MapView } from "@/components/MapView";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Legend } from "@/components/Legend";
 import {
   ChevronLeft,
@@ -10,13 +10,13 @@ import {
   Mountain,
   Cloud,
   Building2,
-  Layers,
-  MapPin,
-  Route,
   Eye,
   EyeOff,
 } from "lucide-react";
 import Link from "next/link";
+import { CategoryTabs } from "@/components/CategoryTabs";
+import { DebugModalType, DebugModals } from "@/components/DebugModals";
+import DebugPanel, { DebugState } from "@/components/DebugPanel";
 
 export type HazardCategory =
   | "flood"
@@ -35,6 +35,21 @@ export interface DriftPredictionPin {
   timestamp: number;
   expiresAt: number;
 }
+
+const hazardLayers: Array<{
+  id: HazardCategory;
+  label: string;
+  icon: React.ComponentType<{ className?: string }>;
+}> = [
+  { id: "flood", label: "Flood", icon: Droplets },
+  { id: "storm-surge", label: "Storm Surge", icon: Waves },
+  { id: "landslide", label: "Landslide", icon: Mountain },
+  { id: "rainfall", label: "Rainfall", icon: Cloud },
+  { id: "buildings", label: "Buildings", icon: Building2 },
+  { id: "elevation", label: "Elevation", icon: Mountain },
+  { id: "facilities", label: "Facilities", icon: Building2 },
+  { id: "roads", label: "Roads", icon: Waves },
+];
 
 export default function Home() {
   // Renamed from RootLayout to Home
@@ -60,12 +75,10 @@ export default function Home() {
     }
     if (!debug.phoneDead) {
       setModal("are-you-safe");
+    } else if (debug.loraDevice) {
+      setModal("lora-sos");
     } else {
-      if (debug.loraDevice) {
-        setModal("lora-sos");
-      } else {
-        setModal("lora-drift");
-      }
+      setModal("lora-drift");
     }
   }, [debug]);
 
@@ -109,7 +122,7 @@ export default function Home() {
       {/* Phone Frame */}
       <div className="relative w-full max-w-sm">
         {/* Phone Bezel */}
-        <div className="rounded-[3rem] border-[12px] border-[#1a1a1a] shadow-2xl overflow-hidden bg-black">
+        <div className="rounded-[3rem] border-12 border-[#1a1a1a] shadow-2xl overflow-hidden bg-black">
           {/* Status Bar */}
           <div className="bg-[#1a1a1a] text-white px-6 py-2 flex justify-between items-center text-xs font-semibold">
             <span>9:41</span>
@@ -125,11 +138,11 @@ export default function Home() {
 
           {/* Screen Content */}
           <div
-            className="bg-gradient-to-br from-[#0f172a] via-[#1a1f35] to-[#111827] overflow-hidden relative flex flex-col"
+            className="bg-linear-to-br from-[#0f172a] via-[#1a1f35] to-[#111827] overflow-hidden relative flex flex-col"
             style={{ height: "844px" }}
           >
             {/* Header */}
-            <header className="bg-gradient-to-r from-[#8B0000]/20 to-[#6B1515]/20 backdrop-blur-md text-white px-4 py-3 shadow-lg flex-shrink-0 border-b border-white/10 relative z-10">
+            <header className="bg-linear-to-r from-[#8B0000]/20 to-[#6B1515]/20 backdrop-blur-md text-white px-4 py-3 shadow-lg shrink-0 border-b border-white/10 relative z-10">
               <div className="flex items-center justify-between">
                 <Link
                   href="/home"
@@ -158,7 +171,7 @@ export default function Home() {
             </div>
 
             {/* Bottom Navigation - Hazard Layer Selector */}
-            <div className="bg-gradient-to-t from-[#0f172a]/98 to-[#1a1f35]/90 backdrop-blur-xl border-t border-white/10 px-2 py-3">
+            <div className="bg-linear-to-t from-[#0f172a]/98 to-[#1a1f35]/90 backdrop-blur-xl border-t border-white/10 px-2 py-3">
               <div
                 className="flex gap-1.5 overflow-x-auto scrollbar-hide"
                 style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
@@ -167,9 +180,9 @@ export default function Home() {
                   <button
                     key={id}
                     onClick={() => setSelectedCategory(id)}
-                    className={`flex flex-col items-center gap-1 px-2 py-2 rounded-lg transition-all min-w-[56px] flex-1 ${
+                    className={`flex flex-col items-center gap-1 px-2 py-2 rounded-lg transition-all min-w-14 flex-1 ${
                       selectedCategory === id
-                        ? "bg-gradient-to-r from-[#8B0000] to-[#6B1515] text-white shadow-lg"
+                        ? "bg-linear-to-r from-[#8B0000] to-[#6B1515] text-white shadow-lg"
                         : "bg-white/5 text-gray-400 border border-white/10 hover:border-white/20"
                     }`}
                   >
@@ -179,12 +192,20 @@ export default function Home() {
                         {label}
                       </span>
                       {selectedCategory === id && (
-                        <button
+                        <div
                           onClick={(e) => {
                             e.stopPropagation();
                             setShowLegend(!showLegend);
                           }}
-                          className="p-0.5 rounded hover:bg-white/20 transition-all"
+                          role="button"
+                          tabIndex={0}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter" || e.key === " ") {
+                              e.stopPropagation();
+                              setShowLegend(!showLegend);
+                            }
+                          }}
+                          className="p-0.5 rounded hover:bg-white/20 transition-all cursor-pointer"
                           title={showLegend ? "Hide legend" : "Show legend"}
                         >
                           {showLegend ? (
@@ -192,7 +213,7 @@ export default function Home() {
                           ) : (
                             <EyeOff className="w-3 h-3" />
                           )}
-                        </button>
+                        </div>
                       )}
                     </div>
                   </button>

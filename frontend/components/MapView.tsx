@@ -224,9 +224,6 @@ export function MapView({ category, hideControls = false }: MapViewProps) {
       document.head.appendChild(style);
     }
 
-    // Load flood data
-    loadFloodData();
-
     // Load initial typhoon data
     loadStormsFor(selectedDate);
 
