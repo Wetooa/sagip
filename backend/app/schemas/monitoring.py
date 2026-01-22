@@ -15,7 +15,7 @@ class WaterLevelReadingBase(BaseSchema):
     longitude: float
     water_level_cm: float
     sensor_status: str
-    metadata: Optional[dict] = None
+    sensor_metadata: Optional[dict] = None
 
 
 class WaterLevelReadingCreate(WaterLevelReadingBase):

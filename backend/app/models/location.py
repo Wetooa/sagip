@@ -1,7 +1,7 @@
 """Location tracking database models."""
 import uuid
 from datetime import datetime
-from sqlalchemy import Column, Float, DateTime, ForeignKey, Enum as SQLEnum, Index
+from sqlalchemy import Column, String, Float, DateTime, ForeignKey, Enum as SQLEnum, Index
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 import enum

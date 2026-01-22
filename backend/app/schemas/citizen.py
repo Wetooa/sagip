@@ -32,6 +32,7 @@ class CitizenResponse(CitizenBase, TimestampSchema):
     id: UUID
     role: str
     is_active: bool
+    has_census_data: Optional[bool] = None  # Indicates if census data exists
 
 
 class CensusDataBase(BaseSchema):
@@ -51,6 +52,18 @@ class CensusDataCreate(CensusDataBase):
     pass
 
 
+class CensusDataUpdate(BaseSchema):
+    """Schema for updating census data."""
+    family_size: Optional[int] = None
+    medical_needs: Optional[str] = None
+    volunteer_willingness: Optional[bool] = None
+    address: Optional[str] = None
+    barangay: Optional[str] = None
+    city: Optional[str] = None
+    province: Optional[str] = None
+    additional_info: Optional[dict] = None
+
+
 class CensusDataResponse(CensusDataBase, TimestampSchema):
     """Schema for census data response."""
     id: UUID
@@ -58,7 +71,7 @@ class CensusDataResponse(CensusDataBase, TimestampSchema):
     submitted_at: datetime
 
 
-class VulnerabilityProfileResponse(BaseSchema, TimestampSchema):
+class VulnerabilityProfileResponse(TimestampSchema):
     """Schema for vulnerability profile response."""
     id: UUID
     citizen_id: UUID

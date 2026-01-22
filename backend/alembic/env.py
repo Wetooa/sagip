@@ -19,7 +19,8 @@ from app.models import *  # noqa: F401, F403
 config = context.config
 
 # Override sqlalchemy.url with the one from settings
-config.set_main_option("sqlalchemy.url", settings.DATABASE_URL)
+# Use the database_url property which constructs the URL from components or uses DATABASE_URL if provided
+config.set_main_option("sqlalchemy.url", settings.database_url)
 
 # Interpret the config file for Python logging.
 # This line sets up loggers basically.
