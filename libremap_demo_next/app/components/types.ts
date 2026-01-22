@@ -25,4 +25,23 @@ export interface TyphoonData {
   agencies: string;
   track: TyphoonPoint[];
   place?: string;
+  startDate?: string;
+  endDate?: string;
+}
+
+export interface PrecipSample {
+  valueMmHr: number | null;
+  colorHex: string;
+  timestamp: string;
+  location: [number, number];
+}
+
+export type MapStyle = "satellite" | "normal";
+
+export interface StormSummary {
+  id: string;
+  name: string;
+  basin?: string;
+  startDate?: string;
+  endDate?: string;
 }
