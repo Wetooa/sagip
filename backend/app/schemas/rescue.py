@@ -63,6 +63,34 @@ class RescueRequestCreate(RescueRequestBase):
     pass
 
 
+class RescueRequestUpdate(BaseSchema):
+    """Payload to update rescue urgency, note, or status."""
+
+    urgency: Optional[str] = None
+    note: Optional[str] = None
+    status: Optional[str] = None
+
+    @field_validator("urgency")
+    @classmethod
+    def validate_update_urgency(cls, value: Optional[str]) -> Optional[str]:
+        if value is None:
+            return value
+        allowed = {"normal", "high", "critical"}
+        if value not in allowed:
+            raise ValueError(f"urgency must be one of {', '.join(sorted(allowed))}")
+        return value
+
+    @field_validator("status")
+    @classmethod
+    def validate_update_status(cls, value: Optional[str]) -> Optional[str]:
+        if value is None:
+            return value
+        allowed = {"open", "in_progress", "resolved", "cancelled"}
+        if value not in allowed:
+            raise ValueError(f"status must be one of {', '.join(sorted(allowed))}")
+        return value
+
+
 class RescueRequestResponse(RescueRequestBase, TimestampSchema):
     """Response model for rescue requests."""
 

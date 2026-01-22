@@ -1,6 +1,7 @@
 """FastAPI application main file."""
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 
 from app.core.config import settings
 from app.core.database import engine, Base
@@ -31,6 +32,9 @@ app.include_router(citizen.router, prefix=f"{settings.API_PREFIX}/citizen", tags
 app.include_router(command.router, prefix=f"{settings.API_PREFIX}/command", tags=["command"])
 app.include_router(shared.router, prefix=f"{settings.API_PREFIX}/shared", tags=["shared"])
 app.include_router(debug.router, prefix=f"{settings.API_PREFIX}/debug", tags=["debug"])
+
+# Serve uploaded assets (e.g., rescue photos)
+app.mount("/static", StaticFiles(directory="app/static"), name="static")
 
 
 @app.get("/")
