@@ -1,5 +1,9 @@
 "use client";
 
+import { useState, useEffect } from 'react';
+import { User, Map, Ticket, Radio, MessageCircle, MapPin, Sparkles, Shield, TrendingUp, Navigation, Loader2 } from 'lucide-react';
+import { useNearestEvacuationCenters } from '@/lib/api/routing';
+import { EvacuationRouteMap } from '@/components/EvacuationRouteMap';
 import { useState, useEffect, useRef } from "react";
 import {
   User,
@@ -633,6 +637,104 @@ const evacuationCenters: EvacuationCenter[] = [
 ];
 
 function EvacuationPointsTab({ onSelectCenter }: { onSelectCenter: (center: EvacuationCenter) => void }) {
+function EvacuationPointsTab() {
+  const [userLocation, setUserLocation] = useState<{ latitude: number; longitude: number } | null>(null);
+  const [locationError, setLocationError] = useState<string | null>(null);
+  const [vehicleType, setVehicleType] = useState<'driving' | 'walking' | 'cycling'>('driving');
+  const [showMap, setShowMap] = useState(false);
+
+  // Get user location on mount
+  useEffect(() => {
+    // Try to get location from localStorage first
+    const storedLocation = localStorage.getItem('userLocation');
+    if (storedLocation) {
+      try {
+        const location = JSON.parse(storedLocation);
+        if (location.latitude && location.longitude) {
+          setUserLocation({ latitude: location.latitude, longitude: location.longitude });
+          return;
+        }
+      } catch (e) {
+        // Invalid stored location, continue to GPS
+      }
+    }
+
+    // Try to get current location from GPS
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          const location = {
+            latitude: position.coords.latitude,
+            longitude: position.coords.longitude,
+          };
+          setUserLocation(location);
+          // Store in localStorage for future use
+          localStorage.setItem('userLocation', JSON.stringify({
+            ...location,
+            timestamp: new Date().toISOString(),
+          }));
+        },
+        (error) => {
+          setLocationError('Unable to get your location. Please enable location services.');
+          // Fallback to Cebu City coordinates
+          setUserLocation({ latitude: 10.3157, longitude: 123.8854 });
+        }
+      );
+    } else {
+      setLocationError('Geolocation is not supported by your browser.');
+      // Fallback to Cebu City coordinates
+      setUserLocation({ latitude: 10.3157, longitude: 123.8854 });
+    }
+  }, []);
+
+  const { data, isLoading, error } = useNearestEvacuationCenters(
+    userLocation?.latitude ?? null,
+    userLocation?.longitude ?? null,
+    vehicleType,
+    true
+  );
+
+  const formatDistance = (meters: number | null): string => {
+    if (meters === null) return 'Unknown';
+    if (meters < 1000) return `${Math.round(meters)}m`;
+    return `${(meters / 1000).toFixed(1)} km`;
+  };
+
+  const formatDuration = (seconds: number | null): string => {
+    if (seconds === null) return 'Unknown';
+    const minutes = Math.round(seconds / 60);
+    if (minutes < 60) return `${minutes} min`;
+    const hours = Math.floor(minutes / 60);
+    const mins = minutes % 60;
+    return `${hours}h ${mins}m`;
+  };
+
+  const getRankColor = (rank: number) => {
+    switch (rank) {
+      case 1:
+        return 'from-blue-500/10 to-blue-400/10 border-blue-500/20 hover:border-blue-500/40';
+      case 2:
+        return 'from-green-500/10 to-green-400/10 border-green-500/20 hover:border-green-500/40';
+      case 3:
+        return 'from-orange-500/10 to-orange-400/10 border-orange-500/20 hover:border-orange-500/40';
+      default:
+        return 'from-gray-500/10 to-gray-400/10 border-gray-500/20 hover:border-gray-500/40';
+    }
+  };
+
+  const getRankBadge = (rank: number) => {
+    switch (rank) {
+      case 1:
+        return '🥇';
+      case 2:
+        return '🥈';
+      case 3:
+        return '🥉';
+      default:
+        return '📍';
+    }
+  };
+
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
@@ -777,7 +879,90 @@ function TicketModal({ isOpen, onClose }: TicketModalProps) {
           >
             <X className="w-5 h-5" />
           </button>
+      {locationError && (
+        <div className="bg-yellow-500/10 border border-yellow-500/20 rounded-xl p-3 text-xs text-yellow-300">
+          {locationError}
         </div>
+      )}
+
+      {/* Vehicle Type Selector */}
+      <div className="flex gap-2">
+        {(['driving', 'walking', 'cycling'] as const).map((type) => (
+          <button
+            key={type}
+            onClick={() => setVehicleType(type)}
+            className={`flex-1 py-2 px-3 rounded-lg text-xs font-medium transition-all ${
+              vehicleType === type
+                ? 'bg-gradient-to-r from-[#ff6b6b] to-[#ff8e72] text-white shadow-lg'
+                : 'bg-white/5 text-gray-400 hover:bg-white/10'
+            }`}
+          >
+            {type.charAt(0).toUpperCase() + type.slice(1)}
+          </button>
+        ))}
+      </div>
+
+      {isLoading && (
+        <div className="flex items-center justify-center py-8">
+          <Loader2 className="w-6 h-6 text-white animate-spin" />
+          <span className="ml-2 text-sm text-gray-300">Finding nearest evacuation centers...</span>
+        </div>
+      )}
+
+      {error && (
+        <div className="bg-red-500/10 border border-red-500/20 rounded-xl p-3 text-xs text-red-300">
+          Failed to load evacuation centers: {error instanceof Error ? error.message : 'Unknown error'}
+        </div>
+      )}
+
+      {data && data.centers && (
+        <>
+          <div className="space-y-2">
+            {data.centers.map((center) => (
+              <div
+                key={center.rank}
+                className={`bg-gradient-to-r ${getRankColor(center.rank)} backdrop-blur-xl rounded-xl p-3 shadow-lg border transition-all`}
+              >
+                <div className="flex items-start justify-between mb-2">
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className="text-lg">{getRankBadge(center.rank)}</span>
+                      <h3 className="font-semibold text-white text-sm">
+                        {center.evacuation_center.name || `Evacuation Center #${center.rank}`}
+                      </h3>
+                    </div>
+                    <p className="text-xs text-gray-400">
+                      {formatDistance(center.route_distance_meters)} away • {formatDuration(center.route_duration_seconds)}
+                    </p>
+                    {center.evacuation_center.capacity && (
+                      <p className="text-xs text-gray-500 mt-1">
+                        Capacity: {center.evacuation_center.capacity}
+                      </p>
+                    )}
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <button
+            onClick={() => setShowMap(true)}
+            className="w-full py-3 bg-gradient-to-r from-red-500 to-red-600 text-white rounded-xl font-medium text-sm hover:shadow-lg hover:shadow-red-500/50 transition-all duration-300 flex items-center justify-center gap-2"
+          >
+            <Navigation className="w-4 h-4" />
+            Show Routes on Map
+          </button>
+        </>
+      )}
+
+      {showMap && userLocation && data?.centers && (
+        <div className="fixed inset-0 z-[100] bg-black/90 flex items-center justify-center p-2">
+          <div className="bg-white rounded-2xl w-full h-full max-h-[90vh] overflow-hidden relative">
+            <EvacuationRouteMap
+              userLocation={userLocation}
+              centers={data.centers}
+              onClose={() => setShowMap(false)}
+            />
 
         {/* Content */}
         <div
@@ -1094,6 +1279,13 @@ function EvacuationRouteModal({ center, onClose }: { center: EvacuationCenter | 
           Start Navigation
         </button>
       </div>
+      )}
+
+      {!isLoading && !error && data && (!data.centers || data.centers.length === 0) && (
+        <div className="bg-gray-500/10 border border-gray-500/20 rounded-xl p-4 text-center text-sm text-gray-400">
+          No evacuation centers found nearby.
+        </div>
+      )}
     </div>
   );
 }

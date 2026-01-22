@@ -128,14 +128,14 @@ class FamilyMemberFactory(BaseFactory):
 
     census_data = factory.SubFactory(CensusDataFactory)
     full_name = factory.LazyAttribute(lambda obj: fake.name())
-    relationship = factory.LazyAttribute(
+    family_relationship = factory.LazyAttribute(
         lambda obj: fake.random_element(elements=["spouse", "child", "parent", "sibling", "other"])
     )
     
     @factory.lazy_attribute
     def age(self):
         """Generate age based on relationship."""
-        relationship = self.relationship
+        relationship = self.family_relationship
         if relationship == "child":
             return random.randint(0, 18)
         elif relationship == "parent":

@@ -19,11 +19,6 @@ const categories = [
   { id: "flood" as HazardCategory, label: "Flood", icon: Droplets },
   { id: "storm-surge" as HazardCategory, label: "Storm Surge", icon: Waves },
   { id: "landslide" as HazardCategory, label: "Landslide", icon: Mountain },
-  { id: "rainfall" as HazardCategory, label: "Rainfall", icon: Cloud },
-  { id: "buildings" as HazardCategory, label: "Buildings", icon: Building2 },
-  { id: "elevation" as HazardCategory, label: "Terrain", icon: Layers },
-  { id: "facilities" as HazardCategory, label: "Facilities", icon: MapPin },
-  { id: "roads" as HazardCategory, label: "Roads", icon: Route },
 ];
 
 export function CategoryTabs({

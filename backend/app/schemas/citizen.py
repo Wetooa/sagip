@@ -51,7 +51,7 @@ class CitizenResponse(CitizenBase, TimestampSchema):
 class FamilyMemberBase(BaseSchema):
     """Base family member schema."""
     full_name: str
-    relationship: str
+    family_relationship: str
     age: Optional[int] = None
     government_id: Optional[str] = None
     is_vulnerable: bool = False
@@ -67,7 +67,7 @@ class FamilyMemberCreate(FamilyMemberBase):
 class FamilyMemberUpdate(BaseSchema):
     """Schema for updating a family member."""
     full_name: Optional[str] = None
-    relationship: Optional[str] = None
+    family_relationship: Optional[str] = None
     age: Optional[int] = None
     government_id: Optional[str] = None
     is_vulnerable: Optional[bool] = None

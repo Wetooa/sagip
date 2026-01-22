@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React from "react";
 import {
   AlertDialog,
   AlertDialogContent,
@@ -46,7 +46,14 @@ export function DebugModals({
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
-              <AlertDialogAction onClick={close}>OK</AlertDialogAction>
+              <AlertDialogAction
+                onClick={() => {
+                  onStatus?.("drift-triggered");
+                  close();
+                }}
+              >
+                OK
+              </AlertDialogAction>
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
@@ -142,7 +149,14 @@ export function DebugModals({
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
-              <AlertDialogAction onClick={close}>OK</AlertDialogAction>
+              <AlertDialogAction
+                onClick={() => {
+                  onStatus?.("drift-triggered");
+                  close();
+                }}
+              >
+                OK
+              </AlertDialogAction>
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
@@ -175,7 +189,14 @@ export function DebugModals({
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
-              <AlertDialogAction onClick={close}>OK</AlertDialogAction>
+              <AlertDialogAction
+                onClick={() => {
+                  onStatus?.("drift-triggered");
+                  close();
+                }}
+              >
+                OK
+              </AlertDialogAction>
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
@@ -192,7 +213,14 @@ export function DebugModals({
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
-              <AlertDialogAction onClick={close}>OK</AlertDialogAction>
+              <AlertDialogAction
+                onClick={() => {
+                  onStatus?.("drift-triggered");
+                  close();
+                }}
+              >
+                OK
+              </AlertDialogAction>
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>

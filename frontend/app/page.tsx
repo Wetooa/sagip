@@ -3,7 +3,19 @@
 import { MapView } from "@/components/MapView";
 import { useState } from "react";
 import { Legend } from "@/components/Legend";
-import { ChevronLeft, Droplets, Waves, Mountain, Cloud, Building2, Layers, MapPin, Route, Eye, EyeOff } from "lucide-react";
+import {
+  ChevronLeft,
+  Droplets,
+  Waves,
+  Mountain,
+  Cloud,
+  Building2,
+  Layers,
+  MapPin,
+  Route,
+  Eye,
+  EyeOff,
+} from "lucide-react";
 import Link from "next/link";
 
 export type HazardCategory =
@@ -16,21 +28,81 @@ export type HazardCategory =
   | "facilities"
   | "roads";
 
-export default function HazardMapPage() {
+export interface DriftPredictionPin {
+  latitude: number;
+  longitude: number;
+  radius: number;
+  timestamp: number;
+  expiresAt: number;
+}
+
+export default function Home() {
+  // Renamed from RootLayout to Home
   const [selectedCategory, setSelectedCategory] =
     useState<HazardCategory>("flood");
   const [showLegend, setShowLegend] = useState(true);
 
-  const hazardLayers = [
-    { id: "flood" as HazardCategory, label: "Flood", icon: Droplets },
-    { id: "storm-surge" as HazardCategory, label: "Storm Surge", icon: Waves },
-    { id: "landslide" as HazardCategory, label: "Landslide", icon: Mountain },
-    { id: "rainfall" as HazardCategory, label: "Rainfall", icon: Cloud },
-    { id: "buildings" as HazardCategory, label: "Buildings", icon: Building2 },
-    { id: "elevation" as HazardCategory, label: "Terrain", icon: Layers },
-    { id: "facilities" as HazardCategory, label: "Facilities", icon: MapPin },
-    { id: "roads" as HazardCategory, label: "Roads", icon: Route },
-  ];
+  // Debug state for all toggles
+  const [debug, setDebug] = useState<DebugState>({
+    duringTyphoon: false,
+    phoneDead: false,
+    internet: true,
+    bluetoothMesh: false,
+    loraDevice: false,
+  });
+  const [modal, setModal] = useState<DebugModalType>(null);
+
+  // User flow logic
+  useEffect(() => {
+    if (!debug.duringTyphoon) {
+      setModal(null);
+      return;
+    }
+    if (!debug.phoneDead) {
+      setModal("are-you-safe");
+    } else {
+      if (debug.loraDevice) {
+        setModal("lora-sos");
+      } else {
+        setModal("lora-drift");
+      }
+    }
+  }, [debug]);
+
+  // Handle modal transitions based on user flow
+  const handleStatus = (status: string) => {
+    if (!debug.phoneDead) {
+      // PHONE ALIVE FLOW
+      if (status === "yes") {
+        setModal(null); // Mark safe
+      } else if (status === "no") {
+        setModal("location-sent");
+      } else if (status === "bluetooth") {
+        // This is triggered by "Try Bluetooth Mesh" in Offline SOS modal
+        if (!debug.internet && !debug.bluetoothMesh) {
+          setModal("location-sent");
+        } else if (debug.bluetoothMesh) {
+          setModal("bluetooth-mesh");
+        } else {
+          setModal("drift-analysis");
+        }
+      } else if (status === "drift") {
+        setModal("drift-analysis");
+      }
+    } else {
+      // DEAD BATTERY FLOW
+      if (debug.loraDevice) {
+        setModal("lora-sos");
+      } else {
+        setModal("lora-drift");
+      }
+    }
+  };
+
+  // LoRa SOS button triggers LoRa modal
+  const handleLoraSOS = () => {
+    setModal("lora-sos");
+  };
 
   return (
     <div className="min-h-screen bg-gray-100 flex items-center justify-center p-4">
@@ -59,14 +131,16 @@ export default function HazardMapPage() {
             {/* Header */}
             <header className="bg-gradient-to-r from-[#8B0000]/20 to-[#6B1515]/20 backdrop-blur-md text-white px-4 py-3 shadow-lg flex-shrink-0 border-b border-white/10 relative z-10">
               <div className="flex items-center justify-between">
-                <Link 
+                <Link
                   href="/home"
                   className="flex items-center gap-2 text-[#F5E6C8]/70 hover:text-[#F5E6C8] transition-all duration-300"
                 >
                   <ChevronLeft className="w-5 h-5" />
                   <span className="text-sm">Back</span>
                 </Link>
-                <span className="text-sm font-medium text-white">Hazard Map</span>
+                <span className="text-sm font-medium text-white">
+                  Hazard Map
+                </span>
                 <div className="w-16"></div>
               </div>
             </header>
@@ -85,7 +159,10 @@ export default function HazardMapPage() {
 
             {/* Bottom Navigation - Hazard Layer Selector */}
             <div className="bg-gradient-to-t from-[#0f172a]/98 to-[#1a1f35]/90 backdrop-blur-xl border-t border-white/10 px-2 py-3">
-              <div className="flex gap-1.5 overflow-x-auto scrollbar-hide" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
+              <div
+                className="flex gap-1.5 overflow-x-auto scrollbar-hide"
+                style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
+              >
                 {hazardLayers.map(({ id, label, icon: Icon }) => (
                   <button
                     key={id}
@@ -98,7 +175,9 @@ export default function HazardMapPage() {
                   >
                     <Icon className="w-4 h-4" />
                     <div className="flex items-center gap-1">
-                      <span className="text-[8px] font-medium whitespace-nowrap">{label}</span>
+                      <span className="text-[8px] font-medium whitespace-nowrap">
+                        {label}
+                      </span>
                       {selectedCategory === id && (
                         <button
                           onClick={(e) => {
@@ -122,6 +201,18 @@ export default function HazardMapPage() {
               <style>{`.scrollbar-hide::-webkit-scrollbar { display: none; }`}</style>
             </div>
           </div>
+
+          <CategoryTabs
+            selectedCategory={selectedCategory}
+            onCategoryChange={setSelectedCategory}
+          />
+          {/* Debug Panel Floating */}
+          <DebugPanel onChange={setDebug} onLoraSOS={handleLoraSOS} />
+          <DebugModals
+            modal={modal}
+            setModal={setModal}
+            onStatus={handleStatus}
+          />
         </div>
       </div>
     </div>

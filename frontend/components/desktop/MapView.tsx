@@ -1,8 +1,17 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import maplibregl from "maplibre-gl";
-import type { HazardCategory } from "app/page";
+
+export type HazardCategory =
+  | "flood"
+  | "storm-surge"
+  | "landslide"
+  | "rainfall"
+  | "buildings"
+  | "elevation"
+  | "facilities"
+  | "roads";
 import { TyphoonData } from "@/types/typhoon";
 import { toast } from "sonner";
 import {
@@ -21,24 +30,10 @@ import { Calendar } from "@/components/ui/calendar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import {
-  Calendar as CalendarIcon,
-  Filter,
-  Loader2,
-  MapPin,
-  RefreshCw,
-  X,
-} from "lucide-react";
+import { Calendar as CalendarIcon, RefreshCw } from "lucide-react";
 import { format } from "date-fns";
-import LocationSearch from "./LocationSearch";
-import { LayerControls } from "./LayerControls";
+// Desktop MapView doesn't include LayerControls or LocationSearch
+// They are handled by the desktop page layout
 import {
   useCensusData,
   useEvacuationCenters,
@@ -46,52 +41,30 @@ import {
 } from "@/lib/api/geojson";
 import type { SicknessType } from "@/types/geojson";
 import { SICKNESS_COLORS } from "@/types/geojson";
-import RescuePinModal from "./RescuePinModal";
 
 interface MapViewProps {
   category: HazardCategory;
-  hideControls?: boolean;
-}
-
-type RescueUrgency = "normal" | "high" | "critical";
-type RescueStatus = "open" | "in_progress" | "resolved" | "cancelled";
-
-interface RescueNeeds {
-  water?: boolean;
-  food?: boolean;
-  medical?: boolean;
-  shelter?: boolean;
-  evacuation?: boolean;
-  other?: string | null;
-}
-
-interface RescuePin {
-  id: string;
-  citizenId?: string | null;
-  name?: string | null;
-  contact?: string | null;
-  householdSize?: number | null;
-  status: RescueStatus;
-  urgency: RescueUrgency;
-  latitude: number;
-  longitude: number;
-  needs: RescueNeeds;
-  note?: string | null;
-  photoUrl?: string | null;
-  createdAt: string;
-  updatedAt?: string | null;
-}
-
-interface RescueFilters {
-  urgency: "all" | RescueUrgency;
-  status: "all" | RescueStatus;
+  // Layer state (controlled from parent)
+  censusEnabled?: boolean;
+  evacuationCentersEnabled?: boolean;
+  barangayEnabled?: boolean;
+  selectedSickness?: SicknessType;
+  // Map ref for LocationSearch
+  onMapReady?: (map: maplibregl.Map | null) => void;
 }
 
 // Cebu City coordinates
 const CEBU_CENTER: [number, number] = [123.8854, 10.3157];
 const DEFAULT_ZOOM = 11;
 
-export function MapView({ category, hideControls = false }: MapViewProps) {
+export function MapView({ 
+  category,
+  censusEnabled: externalCensusEnabled,
+  evacuationCentersEnabled: externalEvacuationCentersEnabled,
+  barangayEnabled: externalBarangayEnabled,
+  selectedSickness: externalSelectedSickness,
+  onMapReady,
+}: MapViewProps) {
   const mapContainer = useRef<HTMLDivElement>(null);
   const map = useRef<maplibregl.Map | null>(null);
   const typhoonInteractionsBound = useRef(false);
@@ -109,61 +82,27 @@ export function MapView({ category, hideControls = false }: MapViewProps) {
   const [datePickerOpen, setDatePickerOpen] = useState(false);
   const [stormDrawerOpen, setStormDrawerOpen] = useState(false);
 
-  // Layer toggle state
-  const [censusEnabled, setCensusEnabled] = useState(false);
-  const [evacuationCentersEnabled, setEvacuationCentersEnabled] =
-    useState(false);
-  const [barangayEnabled, setBarangayEnabled] = useState(false);
+  // Layer toggle state (use external if provided, otherwise internal)
+  const [internalCensusEnabled, setInternalCensusEnabled] = useState(false);
+  const [internalEvacuationCentersEnabled, setInternalEvacuationCentersEnabled] = useState(false);
+  const [internalBarangayEnabled, setInternalBarangayEnabled] = useState(false);
+  const [internalSelectedSickness, setInternalSelectedSickness] = useState<SicknessType>("leptospirosis");
 
-  // Health risk selection state
-  const [selectedSickness, setSelectedSickness] =
-    useState<SicknessType>("leptospirosis");
+  const censusEnabled = externalCensusEnabled ?? internalCensusEnabled;
+  const evacuationCentersEnabled = externalEvacuationCentersEnabled ?? internalEvacuationCentersEnabled;
+  const barangayEnabled = externalBarangayEnabled ?? internalBarangayEnabled;
+  const selectedSickness = externalSelectedSickness ?? internalSelectedSickness;
   const [selectedProvince, setSelectedProvince] = useState<string | null>(
-    "Cebu",
-  );
-
-  // Rescue pin state
-  const [rescuePins, setRescuePins] = useState<RescuePin[]>([]);
-  const [rescueLoading, setRescueLoading] = useState(false);
-  const [pinMode, setPinMode] = useState(false);
-  const [draftCoords, setDraftCoords] = useState<{
-    latitude: number;
-    longitude: number;
-  } | null>(null);
-  const [selectedRescue, setSelectedRescue] = useState<RescuePin | null>(null);
-  const [rescueFilters, setRescueFilters] = useState<RescueFilters>({
-    urgency: "all",
-    status: "open",
-  });
-  const [rescueError, setRescueError] = useState<string | null>(null);
-  const [rescueModalOpen, setRescueModalOpen] = useState(false);
-  const rescuePinsRef = useRef<RescuePin[]>([]);
-  const draftMarker = useRef<maplibregl.Marker | null>(null);
-  const [updatingUrgencyId, setUpdatingUrgencyId] = useState<string | null>(
-    null,
+    "Cebu"
   );
 
   const activePulseFrame = useRef<number | null>(null);
+  const censusHoveredIdRef = useRef<number | null>(null);
 
   // Fetch data using TanStack Query
   const { data: censusData } = useCensusData();
   const { data: evacuationCentersData } = useEvacuationCenters(true);
   const { data: barangayData } = useBarangaysByProvince(selectedProvince);
-
-  // Memoize click handler to avoid recreating on every render
-  const handleRescueClickCallback = useCallback(
-    (e: maplibregl.MapLayerMouseEvent) => {
-      const feature = e.features?.[0];
-      const id = feature?.properties?.id as string | undefined;
-      if (!id) return;
-      const pin = rescuePinsRef.current.find((p) => p.id === id) || null;
-      if (pin) {
-        setSelectedRescue(pin);
-        setRescueModalOpen(true);
-      }
-    },
-    [],
-  );
 
   // Initialize map
   useEffect(() => {
@@ -196,36 +135,16 @@ export function MapView({ category, hideControls = false }: MapViewProps) {
       zoom: DEFAULT_ZOOM,
     });
 
-    // Add navigation controls (compact for mobile) - positioned left side when hideControls for clean mobile UI
+    // Add navigation controls
     map.current.addControl(
       new maplibregl.NavigationControl({ showCompass: false }),
-      hideControls ? "top-left" : "top-right",
+      "top-right",
     );
 
-    // If hideControls, add custom positioning CSS to make zoom buttons more visible and move to center-left
-    if (hideControls && mapContainer.current) {
-      const style = document.createElement("style");
-      style.textContent = `
-        .maplibregl-ctrl-top-left .maplibregl-ctrl-zoom-in,
-        .maplibregl-ctrl-top-left .maplibregl-ctrl-zoom-out {
-          width: 36px !important;
-          height: 36px !important;
-        }
-        .maplibregl-ctrl-top-left .maplibregl-ctrl-group {
-          margin: 120px 0 0 10px !important;
-          box-shadow: 0 4px 12px rgba(0,0,0,0.3) !important;
-          border-radius: 8px !important;
-        }
-        .maplibregl-ctrl-top-left,
-        .maplibregl-ctrl-top-right {
-          display: none !important;
-        }
-      `;
-      document.head.appendChild(style);
+    // Notify parent that map is ready
+    if (onMapReady) {
+      onMapReady(map.current);
     }
-
-    // Load flood data
-    loadFloodData();
 
     // Load initial typhoon data
     loadStormsFor(selectedDate);
@@ -237,10 +156,6 @@ export function MapView({ category, hideControls = false }: MapViewProps) {
       map.current?.remove();
       map.current = null;
     };
-  }, []);
-
-  useEffect(() => {
-    loadRescuePins();
   }, []);
 
   const loadStormsFor = async (date: Date) => {
@@ -298,93 +213,6 @@ export function MapView({ category, hideControls = false }: MapViewProps) {
     }
   };
 
-  useEffect(() => {
-    rescuePinsRef.current = rescuePins;
-  }, [rescuePins]);
-
-  const toRescuePin = (payload: any): RescuePin => ({
-    id: payload.id,
-    citizenId: payload.citizenId ?? payload.citizen_id ?? null,
-    name: payload.name ?? null,
-    contact: payload.contact ?? null,
-    householdSize: payload.householdSize ?? payload.household_size ?? null,
-    status: (payload.status || "open") as RescueStatus,
-    urgency: (payload.urgency || "normal") as RescueUrgency,
-    latitude: payload.latitude,
-    longitude: payload.longitude,
-    needs: {
-      water: Boolean(payload.needs?.water),
-      food: Boolean(payload.needs?.food),
-      medical: Boolean(payload.needs?.medical),
-      shelter: Boolean(payload.needs?.shelter),
-      evacuation: Boolean(payload.needs?.evacuation),
-      other: payload.needs?.other ?? null,
-    },
-    note: payload.note ?? null,
-    photoUrl: payload.photoUrl ?? payload.photo_url ?? null,
-    createdAt: payload.createdAt ?? payload.created_at,
-    updatedAt: payload.updatedAt ?? payload.updated_at,
-  });
-
-  const loadRescuePins = async () => {
-    setRescueLoading(true);
-    setRescueError(null);
-    try {
-      const response = await fetch("/api/rescue-requests?status=all", {
-        cache: "no-store",
-      });
-      if (!response.ok) {
-        throw new Error(`Failed to load rescues (${response.status})`);
-      }
-      const data = (await response.json()) as any[];
-      setRescuePins(data.map(toRescuePin));
-    } catch (error: unknown) {
-      console.error("Failed to load rescue pins", error);
-      setRescueError("Unable to load rescue pins");
-      toast.error("Unable to load rescue pins");
-    } finally {
-      setRescueLoading(false);
-    }
-  };
-
-  const updateRescueSource = useCallback(
-    (mapInstance: maplibregl.Map) => {
-      const source = mapInstance.getSource("rescue-pins") as
-        | maplibregl.GeoJSONSource
-        | undefined;
-      if (!source) return;
-
-      const filtered = rescuePinsRef.current.filter((pin) => {
-        const matchesUrgency =
-          rescueFilters.urgency === "all" ||
-          pin.urgency === rescueFilters.urgency;
-        const matchesStatus =
-          rescueFilters.status === "all" || pin.status === rescueFilters.status;
-        return matchesUrgency && matchesStatus;
-      });
-
-      const features = filtered.map((pin) => ({
-        type: "Feature" as const,
-        geometry: {
-          type: "Point" as const,
-          coordinates: [pin.longitude, pin.latitude],
-        },
-        properties: {
-          id: pin.id,
-          urgency: pin.urgency,
-          status: pin.status,
-          name: pin.name || "Rescue request",
-        },
-      }));
-
-      source.setData({
-        type: "FeatureCollection",
-        features,
-      });
-    },
-    [rescueFilters],
-  );
-
   // Normalize storm data
   const normalizeStorm = (storm: TyphoonData): TyphoonData | null => {
     if (!storm?.track || !Array.isArray(storm.track)) return null;
@@ -408,122 +236,6 @@ export function MapView({ category, hideControls = false }: MapViewProps) {
 
     return { ...storm, track: validTrack };
   };
-
-  // Add rescue layer and interactions
-  useEffect(() => {
-    if (!map.current) return;
-
-    const mapInstance = map.current;
-
-    const ensureRescueLayer = () => {
-      if (!mapInstance.getSource("rescue-pins")) {
-        mapInstance.addSource("rescue-pins", {
-          type: "geojson",
-          data: { type: "FeatureCollection", features: [] },
-        });
-      }
-
-      if (!mapInstance.getLayer("rescue-pins")) {
-        mapInstance.addLayer({
-          id: "rescue-pins",
-          type: "circle",
-          source: "rescue-pins",
-          paint: {
-            "circle-radius": 8,
-            "circle-color": [
-              "match",
-              ["get", "urgency"],
-              "critical",
-              "#ef4444",
-              "high",
-              "#f59e0b",
-              "normal",
-              "#22c55e",
-              "#9ca3af",
-            ],
-            "circle-stroke-color": "#ffffff",
-            "circle-stroke-width": 1.5,
-            "circle-opacity": 0.9,
-          },
-        });
-      }
-
-      const handleEnter = () => {
-        mapInstance.getCanvas().style.cursor = "pointer";
-      };
-      const handleLeave = () => {
-        mapInstance.getCanvas().style.cursor = "";
-      };
-
-      mapInstance.on("click", "rescue-pins", handleRescueClickCallback);
-      mapInstance.on("mouseenter", "rescue-pins", handleEnter);
-      mapInstance.on("mouseleave", "rescue-pins", handleLeave);
-
-      return () => {
-        mapInstance.off("click", "rescue-pins", handleRescueClickCallback);
-        mapInstance.off("mouseenter", "rescue-pins", handleEnter);
-        mapInstance.off("mouseleave", "rescue-pins", handleLeave);
-      };
-    };
-
-    let cleanup: (() => void) | undefined;
-
-    if (mapInstance.loaded()) {
-      cleanup = ensureRescueLayer();
-      updateRescueSource(mapInstance);
-    } else {
-      mapInstance.once("load", () => {
-        cleanup = ensureRescueLayer();
-        updateRescueSource(mapInstance);
-      });
-    }
-
-    return () => {
-      if (cleanup) cleanup();
-    };
-  }, [handleRescueClickCallback, updateRescueSource]);
-
-  useEffect(() => {
-    if (!map.current) return;
-    updateRescueSource(map.current);
-  }, [rescuePins, rescueFilters]);
-
-  useEffect(() => {
-    if (!map.current) return;
-
-    const handler = (e: maplibregl.MapMouseEvent) => {
-      if (!pinMode) return;
-      const coords = { latitude: e.lngLat.lat, longitude: e.lngLat.lng };
-      setDraftCoords(coords);
-      setRescueModalOpen(true);
-      setSelectedRescue(null);
-    };
-
-    map.current.on("click", handler);
-    return () => {
-      map.current?.off("click", handler);
-    };
-  }, [pinMode]);
-
-  useEffect(() => {
-    if (!map.current) return;
-
-    if (draftCoords) {
-      if (!draftMarker.current) {
-        draftMarker.current = new maplibregl.Marker({ color: "#ef4444" })
-          .setLngLat([draftCoords.longitude, draftCoords.latitude])
-          .addTo(map.current);
-      } else {
-        draftMarker.current.setLngLat([
-          draftCoords.longitude,
-          draftCoords.latitude,
-        ]);
-      }
-    } else if (draftMarker.current) {
-      draftMarker.current.remove();
-      draftMarker.current = null;
-    }
-  }, [draftCoords]);
 
   // Create 4-layer typhoon system when storms are loaded
   useEffect(() => {
@@ -752,15 +464,6 @@ export function MapView({ category, hideControls = false }: MapViewProps) {
     const mapInstance = map.current;
 
     if (mapInstance.loaded()) {
-      // Flood visibility
-      if (mapInstance.getLayer("flood-hazard-fill")) {
-        mapInstance.setLayoutProperty(
-          "flood-hazard-fill",
-          "visibility",
-          category === "flood" ? "visible" : "none",
-        );
-      }
-
       // Typhoon visibility
       const showStorms =
         typhoonEnabled &&
@@ -803,27 +506,52 @@ export function MapView({ category, hideControls = false }: MapViewProps) {
 
   // Add census layer
   useEffect(() => {
-    if (!map.current || !censusData || !censusEnabled) {
-      if (map.current?.getLayer("census-layer")) {
-        map.current.setLayoutProperty("census-layer", "visibility", "none");
+    const mapInstance = map.current;
+    if (!mapInstance || !censusData) {
+      return;
+    }
+
+    if (!censusEnabled) {
+      if (mapInstance.getLayer("census-layer")) {
+        mapInstance.setLayoutProperty("census-layer", "visibility", "none");
+        const hid = censusHoveredIdRef.current;
+        if (hid !== null) {
+          try {
+            mapInstance.setFeatureState(
+              { source: "census-source", id: hid },
+              { hover: false }
+            );
+          } catch (_) {}
+          censusHoveredIdRef.current = null;
+        }
+        mapInstance.getCanvas().style.cursor = "";
       }
       return;
     }
 
-    const mapInstance = map.current;
+    const censusWithIds = {
+      ...censusData,
+      features: (censusData as { features: Array<{ properties?: Record<string, unknown> }> }).features.map(
+        (f, i) => ({
+          ...f,
+          properties: { ...(f.properties || {}), id: i },
+        })
+      ),
+    };
 
     const addCensusLayer = () => {
       if (mapInstance.getSource("census-source")) {
         (
           mapInstance.getSource("census-source") as maplibregl.GeoJSONSource
-        ).setData(censusData as any);
+        ).setData(censusWithIds as any);
         mapInstance.setLayoutProperty("census-layer", "visibility", "visible");
         return;
       }
 
       mapInstance.addSource("census-source", {
         type: "geojson",
-        data: censusData as any,
+        data: censusWithIds as any,
+        promoteId: "id",
       });
 
       mapInstance.addLayer({
@@ -833,39 +561,108 @@ export function MapView({ category, hideControls = false }: MapViewProps) {
         paint: {
           "fill-color": [
             "case",
-            ["get", "risk_status"],
+            ["boolean", ["feature-state", "hover"], false],
             [
               "match",
               ["get", "risk_status"],
               1,
-              "#ef4444",
+              "#fb923c",
               2,
-              "#f97316",
+              "#fdba74",
               3,
-              "#eab308",
-              "#22c55e",
+              "#7dd3fc",
+              0,
+              "#93c5fd",
+              "#cbd5e1",
             ],
-            "#94a3b8",
+            [
+              "match",
+              ["get", "risk_status"],
+              1,
+              "#f97316",
+              2,
+              "#fb923c",
+              3,
+              "#38bdf8",
+              0,
+              "#3b82f6",
+              "#94a3b8",
+            ],
           ],
-          "fill-opacity": 0.5,
+          "fill-opacity": [
+            "case",
+            ["boolean", ["feature-state", "hover"], false],
+            0.85,
+            0.5,
+          ],
           "fill-outline-color": "#64748b",
         },
       });
 
+      mapInstance.on("mouseenter", "census-layer", (e) => {
+        mapInstance.getCanvas().style.cursor = "pointer";
+        if (!e.features || e.features.length === 0) return;
+        const id = e.features[0].id as number;
+        if (id == null) return;
+        censusHoveredIdRef.current = id;
+        mapInstance.setFeatureState(
+          { source: "census-source", id },
+          { hover: true }
+        );
+      });
+
+      mapInstance.on("mouseleave", "census-layer", () => {
+        mapInstance.getCanvas().style.cursor = "";
+        const hid = censusHoveredIdRef.current;
+        if (hid !== null) {
+          try {
+            mapInstance.setFeatureState(
+              { source: "census-source", id: hid },
+              { hover: false }
+            );
+          } catch (_) {}
+          censusHoveredIdRef.current = null;
+        }
+      });
+
       mapInstance.on("click", "census-layer", (e) => {
         if (!e.features || e.features.length === 0) return;
-        const props = e.features[0].properties || {};
-        const popup = new maplibregl.Popup()
+        const props = e.features[0].properties as Record<string, unknown> || {};
+        const riskStatus = props.risk_status as number | undefined;
+        const riskLabel =
+          riskStatus === 1
+            ? "High"
+            : riskStatus === 0
+              ? "Low"
+              : riskStatus != null
+                ? String(riskStatus)
+                : "—";
+        const riskClass =
+          riskStatus === 1 ? "risk-high" : riskStatus === 0 ? "risk-low" : "risk-neutral";
+        const pop = (v: unknown) =>
+          typeof v === "number" ? v.toFixed(1) : v != null ? String(v) : "—";
+        const vuln =
+          props.vulnerability_score != null
+            ? (props.vulnerability_score as number).toFixed(2)
+            : "—";
+        const html = `
+          <div class="popup-census">
+            <div class="popup-census__title">Census – Risk Overview</div>
+            <div class="popup-census__risk">
+              <span class="popup-census__badge popup-census__badge--${riskClass}">${riskLabel}</span>
+              ${vuln !== "—" ? `<span class="popup-census__vuln">Vulnerability: ${vuln}</span>` : ""}
+            </div>
+            <dl class="popup-census__dl">
+              <dt>Total population</dt><dd>${pop(props.total_pop)}</dd>
+              <dt>Elderly count</dt><dd>${pop(props.elderly_count)}</dd>
+              <dt>Child count</dt><dd>${pop(props.child_count)}</dd>
+              <dt>Stories</dt><dd>${pop(props.stories)}</dd>
+            </dl>
+          </div>
+        `;
+        new maplibregl.Popup({ className: "popup-census-wrapper" })
           .setLngLat(e.lngLat)
-          .setHTML(
-            `<div>
-              <strong>Census Data</strong><br/>
-              Total Population: ${props.total_pop || "N/A"}<br/>
-              Elderly Count: ${props.elderly_count || "N/A"}<br/>
-              Stories: ${props.stories || "N/A"}<br/>
-              Risk Status: ${props.risk_status || "N/A"}
-            </div>`,
-          )
+          .setHTML(html)
           .addTo(mapInstance);
       });
     };
@@ -884,7 +681,7 @@ export function MapView({ category, hideControls = false }: MapViewProps) {
         map.current.setLayoutProperty(
           "evacuation-centers-layer",
           "visibility",
-          "none",
+          "none"
         );
       }
       return;
@@ -896,13 +693,13 @@ export function MapView({ category, hideControls = false }: MapViewProps) {
       if (mapInstance.getSource("evacuation-centers-source")) {
         (
           mapInstance.getSource(
-            "evacuation-centers-source",
+            "evacuation-centers-source"
           ) as maplibregl.GeoJSONSource
         ).setData(evacuationCentersData as any);
         mapInstance.setLayoutProperty(
           "evacuation-centers-layer",
           "visibility",
-          "visible",
+          "visible"
         );
         return;
       }
@@ -937,7 +734,7 @@ export function MapView({ category, hideControls = false }: MapViewProps) {
               Current: ${props.current_occupancy || "N/A"}<br/>
               Occupancy: ${props.occupancy_percentage || 0}%<br/>
               WiFi: ${props.has_wifi ? "Yes" : "No"}
-            </div>`,
+            </div>`
           )
           .addTo(mapInstance);
       });
@@ -989,16 +786,12 @@ export function MapView({ category, hideControls = false }: MapViewProps) {
 
       if (source) {
         source.setData(processedData as any);
-        mapInstance.setLayoutProperty(
-          "barangay-layer",
-          "visibility",
-          "visible",
-        );
+        mapInstance.setLayoutProperty("barangay-layer", "visibility", "visible");
         // Update paint properties
         mapInstance.setPaintProperty(
           "barangay-layer",
           "fill-color",
-          sicknessColor,
+          sicknessColor
         );
         return;
       }
@@ -1014,7 +807,11 @@ export function MapView({ category, hideControls = false }: MapViewProps) {
         source: "barangay-source",
         paint: {
           "fill-color": ["get", "_computed_color"],
-          "fill-opacity": ["coalesce", ["get", "_computed_opacity"], 0.3],
+          "fill-opacity": [
+            "coalesce",
+            ["get", "_computed_opacity"],
+            0.3,
+          ],
           "fill-outline-color": "#000",
         },
       });
@@ -1035,7 +832,7 @@ export function MapView({ category, hideControls = false }: MapViewProps) {
               <strong>Health Risk</strong><br/>
               ${selectedSickness}: ${sicknessRisk.regression_score || "N/A"}<br/>
               Risk Level: ${sicknessRisk.risk_level || "N/A"}
-            </div>`,
+            </div>`
           )
           .addTo(mapInstance);
       });
@@ -1052,399 +849,8 @@ export function MapView({ category, hideControls = false }: MapViewProps) {
     <div className="relative w-full h-full">
       <div ref={mapContainer} className="w-full h-full" />
 
-      {/* Layer Controls */}
-      <LayerControls
-        censusEnabled={censusEnabled}
-        evacuationCentersEnabled={evacuationCentersEnabled}
-        barangayEnabled={barangayEnabled}
-        onCensusToggle={setCensusEnabled}
-        onEvacuationCentersToggle={setEvacuationCentersEnabled}
-        onBarangayToggle={setBarangayEnabled}
-        selectedSickness={selectedSickness}
-        onSicknessChange={setSelectedSickness}
-      />
-
-      {/* Layer Controls */}
-      <LayerControls
-        censusEnabled={censusEnabled}
-        evacuationCentersEnabled={evacuationCentersEnabled}
-        barangayEnabled={barangayEnabled}
-        onCensusToggle={setCensusEnabled}
-        onEvacuationCentersToggle={setEvacuationCentersEnabled}
-        onBarangayToggle={setBarangayEnabled}
-        selectedSickness={selectedSickness}
-        onSicknessChange={setSelectedSickness}
-      />
-
-      {/* Location Search - Hidden when hideControls */}
-      {!hideControls && <LocationSearch map={map.current} />}
-
-      {/* Date Picker Popover - Top Right - Hidden when hideControls */}
-      {!hideControls && (
-        <div className="absolute top-4 right-16 z-10 flex gap-2">
-          <Button
-            variant={pinMode ? "default" : "outline"}
-            size="sm"
-            onClick={() => {
-              setPinMode(!pinMode);
-              if (!pinMode) {
-                setDraftCoords(null);
-                setSelectedRescue(null);
-                setRescueModalOpen(false);
-                toast.info(
-                  "Pinning mode activated - tap on the map to place a rescue request",
-                );
-              } else {
-                toast.dismiss();
-              }
-            }}
-            className={`h-11 w-11 shadow-lg ${
-              pinMode
-                ? "bg-[#6B1515] hover:bg-[#6B1515]/90 text-white"
-                : "bg-white border-gray-300"
-            }`}
-          >
-            {pinMode ? (
-              <MapPin className="h-4 w-4 animate-pulse" />
-            ) : (
-              <MapPin className="h-4 w-4" />
-            )}
-          </Button>
-
-          <Popover open={datePickerOpen} onOpenChange={setDatePickerOpen}>
-            <PopoverTrigger asChild>
-              <Button
-                variant="outline"
-                size="sm"
-                className="h-11 w-11 bg-white shadow-lg border-gray-300"
-              >
-                <CalendarIcon className="h-4 w-4" />
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent className="w-auto p-0" align="end">
-              <Calendar
-                mode="single"
-                selected={selectedDate}
-                onSelect={handleDateChange}
-                disabled={(date) => date > new Date()}
-              />
-            </PopoverContent>
-          </Popover>
-
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => loadStormsFor(selectedDate)}
-            disabled={typhoonLoading}
-            className="h-11 w-11 bg-white shadow-lg border-gray-300"
-          >
-            <RefreshCw
-              className={`h-4 w-4 ${typhoonLoading ? "animate-spin" : ""}`}
-            />
-          </Button>
-
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => loadRescuePins()}
-            disabled={rescueLoading}
-            className="h-11 w-11 bg-white shadow-lg border-gray-300"
-            title="Refresh rescue requests"
-          >
-            <RefreshCw
-              className={`h-4 w-4 ${rescueLoading ? "animate-spin" : ""}`}
-            />
-          </Button>
-        </div>
-      )}
-
-      {/* Rescue Filters - Below Controls - Hidden when hideControls */}
-      {!hideControls && (
-        <div className="absolute top-20 right-4 z-10 bg-white shadow-lg rounded-lg p-3 max-w-72">
-          <div className="flex items-center gap-2 mb-2 text-xs font-semibold text-gray-700">
-            <Filter className="h-3 w-3" />
-            Rescue Filters
-          </div>
-          <div className="space-y-2">
-            <div className="flex items-center gap-2">
-              <label className="text-xs font-medium text-gray-600 w-16">
-                Urgency:
-              </label>
-              <Select
-                value={rescueFilters.urgency}
-                onValueChange={(value) =>
-                  setRescueFilters({
-                    ...rescueFilters,
-                    urgency: value as any,
-                  })
-                }
-              >
-                <SelectTrigger className="h-8 text-xs w-32">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All</SelectItem>
-                  <SelectItem value="normal">Normal</SelectItem>
-                  <SelectItem value="high">High</SelectItem>
-                  <SelectItem value="critical">Critical</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="flex items-center gap-2">
-              <label className="text-xs font-medium text-gray-600 w-16">
-                Status:
-              </label>
-              <Select
-                value={rescueFilters.status}
-                onValueChange={(value) =>
-                  setRescueFilters({
-                    ...rescueFilters,
-                    status: value as any,
-                  })
-                }
-              >
-                <SelectTrigger className="h-8 text-xs w-32">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All</SelectItem>
-                  <SelectItem value="open">Open</SelectItem>
-                  <SelectItem value="in_progress">In Progress</SelectItem>
-                  <SelectItem value="resolved">Resolved</SelectItem>
-                  <SelectItem value="cancelled">Cancelled</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Rescue Pin Modal for Create/View - Hidden when hideControls */}
-      {!hideControls && rescueModalOpen && (draftCoords || selectedRescue) && (
-        <RescuePinModal
-          open={rescueModalOpen}
-          onOpenChange={(open: boolean) => {
-            setRescueModalOpen(open);
-            if (!open) {
-              setDraftCoords(null);
-              setPinMode(false);
-              setSelectedRescue(null);
-            }
-          }}
-          coords={draftCoords}
-          pin={selectedRescue}
-          onCreateSuccess={(newPin: RescuePin) => {
-            setRescuePins([...rescuePins, newPin]);
-            setRescueModalOpen(false);
-            setDraftCoords(null);
-            setPinMode(false);
-            setSelectedRescue(null);
-            toast.success("Rescue request created!");
-          }}
-          onUrgencyChange={async (urgency: RescueUrgency) => {
-            if (!selectedRescue) return;
-            setUpdatingUrgencyId(selectedRescue.id);
-            try {
-              const response = await fetch(
-                `/api/rescue-requests/${selectedRescue.id}`,
-                {
-                  method: "PATCH",
-                  headers: { "Content-Type": "application/json" },
-                  body: JSON.stringify({ urgency }),
-                },
-              );
-              if (!response.ok) {
-                throw new Error("Failed to update urgency");
-              }
-              const updated = await response.json();
-              setRescuePins(
-                rescuePins.map((p) =>
-                  p.id === updated.id ? toRescuePin(updated) : p,
-                ),
-              );
-              setSelectedRescue(toRescuePin(updated));
-              toast.success("Urgency updated");
-            } catch (error: unknown) {
-              console.error("Error updating urgency", error);
-              toast.error("Failed to update urgency");
-            } finally {
-              setUpdatingUrgencyId(null);
-            }
-          }}
-          updatingUrgency={updatingUrgencyId === selectedRescue?.id}
-        />
-      )}
-
-      {/* Rescue Pin Detail Popup - Hidden when hideControls */}
-      {!hideControls && selectedRescue && !rescueModalOpen && (
-        <div className="absolute bottom-32 left-4 z-20 bg-white rounded-lg shadow-lg p-4 max-w-sm">
-          <div className="flex justify-between items-start mb-3">
-            <div>
-              <h3 className="font-semibold text-gray-900">
-                {selectedRescue.name || "Rescue Request"}
-              </h3>
-              <p className="text-xs text-gray-500">
-                {selectedRescue.contact && `📱 ${selectedRescue.contact}`}
-              </p>
-            </div>
-            <button
-              onClick={() => setSelectedRescue(null)}
-              className="text-gray-400 hover:text-gray-600"
-            >
-              <X className="h-4 w-4" />
-            </button>
-          </div>
-
-          <div className="mb-2 flex flex-wrap gap-1">
-            <Badge
-              className={`text-xs font-semibold ${
-                selectedRescue.urgency === "critical"
-                  ? "bg-red-100 text-red-800"
-                  : selectedRescue.urgency === "high"
-                    ? "bg-amber-100 text-amber-800"
-                    : "bg-green-100 text-green-800"
-              }`}
-            >
-              {selectedRescue.urgency.toUpperCase()}
-            </Badge>
-            <Badge variant="outline" className="text-xs">
-              {selectedRescue.status.replace(/_/g, " ")}
-            </Badge>
-          </div>
-
-          {selectedRescue.needs && (
-            <div className="mb-2">
-              <p className="text-xs font-medium text-gray-700 mb-1">Needs:</p>
-              <div className="flex flex-wrap gap-1">
-                {selectedRescue.needs.water && (
-                  <Badge variant="secondary" className="text-xs">
-                    Water
-                  </Badge>
-                )}
-                {selectedRescue.needs.food && (
-                  <Badge variant="secondary" className="text-xs">
-                    Food
-                  </Badge>
-                )}
-                {selectedRescue.needs.medical && (
-                  <Badge variant="secondary" className="text-xs">
-                    Medical
-                  </Badge>
-                )}
-                {selectedRescue.needs.shelter && (
-                  <Badge variant="secondary" className="text-xs">
-                    Shelter
-                  </Badge>
-                )}
-                {selectedRescue.needs.evacuation && (
-                  <Badge variant="secondary" className="text-xs">
-                    Evacuation
-                  </Badge>
-                )}
-              </div>
-            </div>
-          )}
-
-          {selectedRescue.note && (
-            <p className="text-xs text-gray-600 mb-3 italic">
-              "{selectedRescue.note}"
-            </p>
-          )}
-
-          {selectedRescue.photoUrl && (
-            <img
-              src={selectedRescue.photoUrl}
-              alt="Rescue location"
-              className="w-full h-24 object-cover rounded mb-2"
-            />
-          )}
-
-          <div className="flex gap-2">
-            <Button
-              size="sm"
-              variant="outline"
-              className="flex-1 text-xs"
-              onClick={() => setRescueModalOpen(true)}
-            >
-              View Details
-            </Button>
-            <Select
-              value={selectedRescue.urgency}
-              onValueChange={async (value) => {
-                await setUpdatingUrgencyId(selectedRescue.id);
-                try {
-                  const response = await fetch(
-                    `/api/rescue-requests/${selectedRescue.id}`,
-                    {
-                      method: "PATCH",
-                      headers: { "Content-Type": "application/json" },
-                      body: JSON.stringify({ urgency: value }),
-                    },
-                  );
-                  if (!response.ok) {
-                    throw new Error("Failed to update urgency");
-                  }
-                  const updated = await response.json();
-                  setRescuePins(
-                    rescuePins.map((p) =>
-                      p.id === updated.id ? toRescuePin(updated) : p,
-                    ),
-                  );
-                  setSelectedRescue(toRescuePin(updated));
-                  toast.success("Urgency updated");
-                } catch (error: unknown) {
-                  console.error("Error updating urgency", error);
-                  toast.error("Failed to update urgency");
-                } finally {
-                  setUpdatingUrgencyId(null);
-                }
-              }}
-              disabled={updatingUrgencyId !== null}
-            >
-              <SelectTrigger className="h-8 text-xs flex-1">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="normal">Normal</SelectItem>
-                <SelectItem value="high">High</SelectItem>
-                <SelectItem value="critical">Critical</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-        </div>
-      )}
-
       {/* Date Picker Popover - Top Right */}
       <div className="absolute top-4 right-16 z-10 flex gap-2">
-        <Button
-          variant={pinMode ? "default" : "outline"}
-          size="sm"
-          onClick={() => {
-            setPinMode(!pinMode);
-            if (!pinMode) {
-              setDraftCoords(null);
-              setSelectedRescue(null);
-              setRescueModalOpen(false);
-              toast.info(
-                "Pinning mode activated - tap on the map to place a rescue request",
-              );
-            } else {
-              toast.dismiss();
-            }
-          }}
-          className={`h-11 w-11 shadow-lg ${
-            pinMode
-              ? "bg-[#6B1515] hover:bg-[#6B1515]/90 text-white"
-              : "bg-white border-gray-300"
-          }`}
-        >
-          {pinMode ? (
-            <MapPin className="h-4 w-4 animate-pulse" />
-          ) : (
-            <MapPin className="h-4 w-4" />
-          )}
-        </Button>
-
         <Popover open={datePickerOpen} onOpenChange={setDatePickerOpen}>
           <PopoverTrigger asChild>
             <Button
@@ -1476,24 +882,10 @@ export function MapView({ category, hideControls = false }: MapViewProps) {
             className={`h-4 w-4 ${typhoonLoading ? "animate-spin" : ""}`}
           />
         </Button>
-
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => loadRescuePins()}
-          disabled={rescueLoading}
-          className="h-11 w-11 bg-white shadow-lg border-gray-300"
-          title="Refresh rescue requests"
-        >
-          <RefreshCw
-            className={`h-4 w-4 ${rescueLoading ? "animate-spin" : ""}`}
-          />
-        </Button>
       </div>
 
-      {/* Storm List Drawer - Bottom Right - Hidden when hideControls */}
-      {!hideControls &&
-        storms.length > 0 &&
+      {/* Storm List Drawer - Bottom Right */}
+      {storms.length > 0 &&
         (category === "storm-surge" || category === "rainfall") && (
           <Drawer open={stormDrawerOpen} onOpenChange={setStormDrawerOpen}>
             <DrawerTrigger asChild>
@@ -1540,8 +932,8 @@ export function MapView({ category, hideControls = false }: MapViewProps) {
           </Drawer>
         )}
 
-      {/* Active Storm Navigation - Bottom Center - Hidden when hideControls */}
-      {!hideControls && activeStormId && activeStorm && (
+      {/* Active Storm Navigation - Bottom Center */}
+      {activeStormId && activeStorm && (
         <div className="absolute inset-x-0 bottom-19 flex justify-center z-30">
           <div className="flex items-center gap-2 bg-white/95 backdrop-blur rounded-full px-3 py-2 shadow-lg border min-w-60">
             <button
@@ -1746,7 +1138,7 @@ function updateActiveStorm(
   try {
     mapInstance.easeTo({
       center: activePoint.coordinates,
-      zoom: Math.max(mapInstance.getZoom(), 2),
+      zoom: Math.max(mapInstance.getZoom(), 10),
       duration: 800,
     });
   } catch (err) {

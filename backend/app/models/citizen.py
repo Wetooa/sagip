@@ -159,7 +159,7 @@ class FamilyMember(Base):
         UUID(as_uuid=True), ForeignKey("census_data.id"), nullable=False, index=True
     )
     full_name = Column(String, nullable=False)
-    relationship = Column(String, nullable=False)  # e.g., "spouse", "child", "parent", "sibling"
+    family_relationship = Column(String, nullable=False)  # e.g., "spouse", "child", "parent", "sibling"
     age = Column(Integer, nullable=True)
     government_id = Column(String, nullable=True)
     is_vulnerable = Column(Boolean, nullable=False, default=False, index=True)

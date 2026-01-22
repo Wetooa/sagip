@@ -10,8 +10,11 @@ All endpoints return standard GeoJSON FeatureCollection format.
 from fastapi import APIRouter, HTTPException, Query
 from fastapi.responses import JSONResponse
 from pathlib import Path
-from typing import Optional
+from typing import Optional, Dict, Any
 import logging
+import random
+import hashlib
+from datetime import datetime, timedelta
 
 from app.core.config import settings
 from app.schemas.hazard import GeoJSONFeatureCollection
@@ -299,6 +302,101 @@ async def get_storm_surge_data(
         raise HTTPException(status_code=500, detail=f"Error processing storm surge hazard data: {str(e)}")
 
 
+def parse_capacity_to_max_occupancy(capacity: Optional[str]) -> int:
+    """
+    Parse capacity string and generate a random max_occupancy value within the range.
+    
+    Args:
+        capacity: Capacity string like ">500", "100-250", "250-500", or None
+        
+    Returns:
+        Random integer within the appropriate range based on capacity string
+    """
+    if capacity is None:
+        return random.randint(50, 1000)
+    
+    capacity = capacity.strip()
+    
+    # Handle ">500" format
+    if capacity.startswith(">"):
+        try:
+            min_val = int(capacity[1:])
+            return random.randint(min_val, min_val + 500)  # Range from min to min+500
+        except ValueError:
+            return random.randint(50, 1000)
+    
+    # Handle "100-250" or "250-500" format
+    if "-" in capacity:
+        try:
+            parts = capacity.split("-")
+            min_val = int(parts[0].strip())
+            max_val = int(parts[1].strip())
+            return random.randint(min_val, max_val)
+        except (ValueError, IndexError):
+            return random.randint(50, 1000)
+    
+    # If we can't parse it, return default range
+    return random.randint(50, 1000)
+
+
+def convert_geometry_to_point(geometry: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Convert Polygon or MultiPolygon geometry to Point geometry using centroid.
+    
+    This function is used to convert building boundary geometries to point
+    representations for proper circle rendering on the frontend map.
+    
+    Args:
+        geometry: GeoJSON geometry object (Point, Polygon, or MultiPolygon)
+        
+    Returns:
+        Point geometry with centroid coordinates [longitude, latitude]
+    """
+    geom_type = geometry.get("type")
+    coordinates = geometry.get("coordinates")
+    
+    if geom_type == "Point":
+        return geometry
+    
+    elif geom_type == "Polygon":
+        # Calculate centroid from exterior ring
+        ring = coordinates[0] if coordinates else []
+        if not ring:
+            return {"type": "Point", "coordinates": [0, 0]}
+        
+        total_lon = sum(coord[0] for coord in ring)
+        total_lat = sum(coord[1] for coord in ring)
+        count = len(ring)
+        
+        return {
+            "type": "Point",
+            "coordinates": [total_lon / count, total_lat / count]
+        }
+    
+    elif geom_type == "MultiPolygon":
+        # Collect all points from all polygons
+        all_points = []
+        for polygon in coordinates:
+            if polygon and len(polygon) > 0:
+                ring = polygon[0]  # Exterior ring
+                all_points.extend(ring)
+        
+        if not all_points:
+            return {"type": "Point", "coordinates": [0, 0]}
+        
+        total_lon = sum(coord[0] for coord in all_points)
+        total_lat = sum(coord[1] for coord in all_points)
+        count = len(all_points)
+        
+        return {
+            "type": "Point",
+            "coordinates": [total_lon / count, total_lat / count]
+        }
+    
+    # Fallback for unknown geometry types
+    return {"type": "Point", "coordinates": [0, 0]}
+
+
 @router.get("/evacuation-centers", response_model=GeoJSONFeatureCollection)
 async def get_evacuation_centers(
     cleaned: Optional[bool] = Query(True, description="Use cleaned data (true) or raw data (false)")
@@ -346,6 +444,38 @@ async def get_evacuation_centers(
         
         geojson = load_geojson_file(geojson_path)
         
+        # Add randomized properties to each feature for presentation
+        for feature in geojson.get("features", []):
+            props = feature.get("properties", {})
+            
+            # Generate max_occupancy based on existing capacity field
+            max_occupancy = parse_capacity_to_max_occupancy(props.get("capacity"))
+            
+            # Generate current_occupancy (0 to max_occupancy)
+            current_occupancy = random.randint(0, max_occupancy)
+            
+            # Generate has_wifi (90% True, 10% False)
+            has_wifi = random.random() < 0.9
+            
+            # Generate last_updated (random timestamp within last 7 days)
+            days_ago = random.uniform(0, 7)
+            last_updated = (datetime.utcnow() - timedelta(days=days_ago)).isoformat() + "Z"
+            
+            # Calculate occupancy_percentage
+            occupancy_percentage = round((current_occupancy / max_occupancy) * 100, 1) if max_occupancy > 0 else 0.0
+            
+            # Add new properties
+            props["max_occupancy"] = max_occupancy
+            props["current_occupancy"] = current_occupancy
+            props["has_wifi"] = has_wifi
+            props["last_updated"] = last_updated
+            props["occupancy_percentage"] = occupancy_percentage
+        
+        # Convert Polygon/MultiPolygon geometries to Point geometries for proper circle rendering
+        for feature in geojson.get("features", []):
+            if "geometry" in feature:
+                feature["geometry"] = convert_geometry_to_point(feature["geometry"])
+        
         return JSONResponse(
             content=geojson,
             headers={
@@ -363,3 +493,173 @@ async def get_evacuation_centers(
     except Exception as e:
         logger.error(f"Error loading evacuation center data: {e}")
         raise HTTPException(status_code=500, detail=f"Error loading evacuation center data: {str(e)}")
+
+
+def generate_health_risks(barangay_id: str) -> dict:
+    """
+    Generate mock health risk data for a barangay.
+    
+    Uses a consistent seed based on barangay ID to ensure reproducible results.
+    Each barangay will have health risk predictions for the 3 sickness types
+    that match the available AI models.
+    
+    Args:
+        barangay_id: Unique identifier for the barangay (used as seed)
+        
+    Returns:
+        Dictionary with health risk data structure (sickness-first):
+        {
+            "leptospirosis": {
+                "regression_score": 0.65,
+                "risk_level": "medium"
+            },
+            "dengue_chikungunya": {
+                "regression_score": 0.45,
+                "risk_level": "low"
+            },
+            "acute_bloody_diarrhea_cholera_typhoid": {
+                "regression_score": 0.78,
+                "risk_level": "high"
+            }
+        }
+    """
+    # Create a deterministic seed from barangay ID
+    seed_hash = int(hashlib.md5(barangay_id.encode()).hexdigest()[:8], 16)
+    rng = random.Random(seed_hash)
+    
+    # Three sicknesses matching the three AI models
+    sicknesses = [
+        "leptospirosis",
+        "dengue_chikungunya",
+        "acute_bloody_diarrhea_cholera_typhoid"
+    ]
+    
+    health_risks = {}
+    
+    for sickness in sicknesses:
+        # Add slight variation per sickness by modifying seed
+        sickness_seed = seed_hash + hash(sickness)
+        sickness_rng = random.Random(sickness_seed)
+        
+        # Generate regression score (0-1)
+        regression_score = round(sickness_rng.uniform(0.0, 1.0), 3)
+        
+        # Map score to risk level
+        if regression_score < 0.3:
+            risk_level = "low"
+        elif regression_score < 0.7:
+            risk_level = "medium"
+        else:
+            risk_level = "high"
+        
+        health_risks[sickness] = {
+            "regression_score": regression_score,
+            "risk_level": risk_level
+        }
+    
+    return health_risks
+
+
+@router.get("/barangays", response_model=GeoJSONFeatureCollection)
+async def get_barangays_by_province(
+    province: str = Query(..., description="Province name (e.g., 'Cebu', 'Abra')")
+):
+    """
+    Get barangay data filtered by province with health risk data.
+    
+    This endpoint returns GeoJSON FeatureCollection containing barangay boundaries
+    for the specified province. Each barangay includes mock health outbreak data
+    with predictions from multiple AI models for different sicknesses.
+    
+    Args:
+        province: Province name (e.g., 'Cebu', 'Abra', 'Agusan del Sur')
+        
+    Returns:
+        GeoJSON FeatureCollection with barangay data and health risks
+        
+    Example Request:
+        GET /api/shared/geojson/barangays?province=Cebu
+        
+    Example Response:
+        {
+            "type": "FeatureCollection",
+            "features": [
+                {
+                    "type": "Feature",
+                    "properties": {
+                        "ID_0": 177,
+                        "NAME_0": "Philippines",
+                        "PROVINCE": "Cebu",
+                        "NAME_3": "Barangay Name",
+                        "health_risks": {
+                            "model_1": {
+                                "dengue": {"regression_score": 0.65, "risk_level": "medium"},
+                                ...
+                            },
+                            ...
+                        }
+                    },
+                    "geometry": {
+                        "type": "Polygon",
+                        "coordinates": [[[123.0, 10.0], ...]]
+                    }
+                }
+            ]
+        }
+    """
+    try:
+        data_path = get_backend_data_path()
+        geojson_path = data_path / "geojsonph" / "Barangay" / "Barangays.json"
+        
+        geojson = load_geojson_file(geojson_path)
+        
+        # Filter features by province
+        filtered_features = []
+        for feature in geojson.get("features", []):
+            props = feature.get("properties", {})
+            feature_province = props.get("PROVINCE", "")
+            
+            # Case-insensitive matching
+            if feature_province.lower() == province.lower():
+                # Generate unique ID for barangay (use ID_3 or NAME_3 as fallback)
+                barangay_id = str(props.get("ID_3", props.get("NAME_3", "")))
+                if not barangay_id:
+                    # Fallback to a combination of available fields
+                    barangay_id = f"{props.get('NAME_1', '')}_{props.get('NAME_2', '')}_{props.get('NAME_3', '')}"
+                
+                # Generate health risk data
+                health_risks = generate_health_risks(barangay_id)
+                
+                # Add health risks to properties
+                props["health_risks"] = health_risks
+                
+                filtered_features.append(feature)
+        
+        if not filtered_features:
+            raise HTTPException(
+                status_code=404,
+                detail=f"No barangays found for province '{province}'. Please check the province name."
+            )
+        
+        # Return filtered GeoJSON
+        filtered_geojson = {
+            "type": "FeatureCollection",
+            "features": filtered_features
+        }
+        
+        return JSONResponse(
+            content=filtered_geojson,
+            headers={
+                'Content-Type': 'application/json',
+                'Cache-Control': 'public, s-maxage=3600, stale-while-revalidate=86400',
+            }
+        )
+        
+    except HTTPException:
+        raise
+    except FileNotFoundError as e:
+        logger.error(f"Barangay GeoJSON file not found: {e}")
+        raise HTTPException(status_code=404, detail="Barangay data file not found")
+    except Exception as e:
+        logger.error(f"Error loading barangay data: {e}")
+        raise HTTPException(status_code=500, detail=f"Error loading barangay data: {str(e)}")

@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google"; // Or your fonts
 import "./globals.css"; // Ensure this points to the merged CSS
+import { Providers } from "./providers";
+import { SaggyChatbot } from "@/components/SaggyChatbot";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -25,8 +27,11 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className={`${geistSans.variable} ${geistMono.variable} antialiased bg-gray-900`}>
-        {/* The children (your page.tsx) will render inside here */}
-        {children}
+        <Providers>
+          {/* The children (your page.tsx) will render inside here */}
+          {children}
+          <SaggyChatbot />
+        </Providers>
       </body>
     </html>
   );

@@ -40,56 +40,6 @@ const legendData: Record<
       { color: "#F4E4C1", label: "Minimal Risk" },
     ],
   },
-  rainfall: {
-    title: "Rainfall & Typhoons",
-    items: [
-      { color: "#ff4500", label: "Typhoon Track" },
-      { color: "#6B1515", label: "Intense (>30mm/hr)" },
-      { color: "#FF4545", label: "Heavy (20-30mm/hr)" },
-      { color: "#FF8A3D", label: "Moderate (10-20mm/hr)" },
-      { color: "#FFA500", label: "Light (5-10mm/hr)" },
-    ],
-  },
-  buildings: {
-    title: "Building Footprints",
-    items: [
-      { color: "#6B1515", label: "High-rise (>10 floors)" },
-      { color: "#8B4513", label: "Mid-rise (4-10 floors)" },
-      { color: "#A8B5A0", label: "Low-rise (1-3 floors)" },
-      { color: "#D3D3D3", label: "Residential" },
-      { color: "#F0F0F0", label: "Temporary structures" },
-    ],
-  },
-  elevation: {
-    title: "Elevation/Terrain (DTM)",
-    items: [
-      { color: "#8B4513", label: "> 500m elevation" },
-      { color: "#D2691E", label: "200-500m elevation" },
-      { color: "#DEB887", label: "100-200m elevation" },
-      { color: "#F4E4C1", label: "50-100m elevation" },
-      { color: "#90EE90", label: "< 50m elevation" },
-    ],
-  },
-  facilities: {
-    title: "Critical Facilities",
-    items: [
-      { color: "#FF4545", label: "Hospitals" },
-      { color: "#FF8A3D", label: "Fire Stations" },
-      { color: "#FFA500", label: "Police Stations" },
-      { color: "#3B82F6", label: "Schools" },
-      { color: "#2ECC71", label: "Evacuation Centers" },
-    ],
-  },
-  roads: {
-    title: "Road Network",
-    items: [
-      { color: "#6B1515", label: "Major highways" },
-      { color: "#8B4513", label: "Main roads" },
-      { color: "#A8B5A0", label: "Secondary roads" },
-      { color: "#D3D3D3", label: "Local streets" },
-      { color: "#F0F0F0", label: "Unpaved roads" },
-    ],
-  },
 };
 
 export function Legend({ category, onClose }: LegendProps) {
