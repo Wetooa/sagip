@@ -1,11 +1,10 @@
 "use client";
 
+import { CategoryTabs } from "@/components/CategoryTabs";
+import { Header } from "@/components/Header";
+import { MapView } from "@/components/MapView";
 import { useState } from "react";
-// Update these import paths if necessary!
-import { MapView } from "@/components/ui/MapView";
-import { CategoryTabs } from "@/components/ui/CategoryTabs";
-import { Legend } from "@/components/ui/Legend";
-import { Header } from "@/components/ui/Header";
+import { Legend } from "@/components/Legend";
 
 export type HazardCategory =
   | "flood"

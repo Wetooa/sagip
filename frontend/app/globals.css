@@ -1,10 +1,11 @@
 @import "tailwindcss";
 @import "tw-animate-css";
+@import "maplibre-gl/dist/maplibre-gl.css";
 
 @custom-variant dark (&:is(.dark *));
 
 :root {
-  /* Main Project Defaults */ 
+  /* Main Project Defaults */
 
   /* Shadcn/Figma Component Colors */
   --card: oklch(1 0 0);
@@ -156,11 +157,33 @@
 }
 
 @layer base {
-  :where(:not(:has([class*=' text-']), :not(:has([class^='text-'])))) {
-    h1 { font-size: 1.5rem; font-weight: var(--font-weight-medium); line-height: 1.5; }
-    h2 { font-size: 1.25rem; font-weight: var(--font-weight-medium); line-height: 1.5; }
-    h3 { font-size: 1.125rem; font-weight: var(--font-weight-medium); line-height: 1.5; }
-    h4 { font-size: 1rem; font-weight: var(--font-weight-medium); line-height: 1.5; }
-    button, input, label { font-size: 1rem; font-weight: var(--font-weight-medium); line-height: 1.5; }
+  :where(:not(:has([class*=" text-"]), :not(:has([class^="text-"])))) {
+    h1 {
+      font-size: 1.5rem;
+      font-weight: var(--font-weight-medium);
+      line-height: 1.5;
+    }
+    h2 {
+      font-size: 1.25rem;
+      font-weight: var(--font-weight-medium);
+      line-height: 1.5;
+    }
+    h3 {
+      font-size: 1.125rem;
+      font-weight: var(--font-weight-medium);
+      line-height: 1.5;
+    }
+    h4 {
+      font-size: 1rem;
+      font-weight: var(--font-weight-medium);
+      line-height: 1.5;
+    }
+    button,
+    input,
+    label {
+      font-size: 1rem;
+      font-weight: var(--font-weight-medium);
+      line-height: 1.5;
+    }
   }
 }
