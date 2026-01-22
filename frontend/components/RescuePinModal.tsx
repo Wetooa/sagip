@@ -1,15 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { memo, useState, useEffect } from "react";
 import { Loader2, X, Camera } from "lucide-react";
 import { toast } from "sonner";
-import {
-  Sheet,
-  SheetContent,
-  SheetDescription,
-  SheetHeader,
-  SheetTitle,
-} from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
@@ -18,6 +11,13 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { AlertTriangle } from "lucide-react";
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/ui/sheet";
 
 interface RescueNeeds {
   water?: boolean;
@@ -611,3 +611,5 @@ export function RescuePinModal({
     </Sheet>
   );
 }
+
+export default memo(RescuePinModal);

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 
 const API_BASE =
   process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000/api";
+const API_ORIGIN = new URL(API_BASE).origin;
 
 interface RescueNeeds {
   water?: boolean;
@@ -67,7 +68,11 @@ const toRescuePin = (payload: RescueRequestResponse): RescuePin => ({
   longitude: payload.longitude,
   needs: normalizeNeeds(payload.needs ?? {}),
   note: payload.note ?? null,
-  photoUrl: payload.photo_url ?? null,
+  photoUrl: payload.photo_url
+    ? payload.photo_url.startsWith("http")
+      ? payload.photo_url
+      : `${API_ORIGIN}${payload.photo_url}`
+    : null,
   createdAt: payload.created_at,
   updatedAt: payload.updated_at,
 });
@@ -79,10 +84,10 @@ export async function GET(request: NextRequest) {
   const offset = searchParams.get("offset") || "0";
 
   try {
-    const url = new URL(
-      `/requests?status=${encodeURIComponent(status)}&limit=${limit}&offset=${offset}`,
-      `${API_BASE}/shared/rescue`,
-    );
+    const url = new URL(`${API_BASE}/shared/rescue/requests`);
+    url.searchParams.set("status", status);
+    url.searchParams.set("limit", limit);
+    url.searchParams.set("offset", offset);
 
     const response = await fetch(url.toString(), {
       method: "GET",

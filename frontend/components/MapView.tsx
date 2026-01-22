@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import maplibregl from "maplibre-gl";
 import type { HazardCategory } from "app/page";
 import { FloodGeoJSON } from "@/types/flood";
@@ -39,7 +39,7 @@ import {
 } from "lucide-react";
 import { format } from "date-fns";
 import LocationSearch from "./LocationSearch";
-import { RescuePinModal } from "./RescuePinModal";
+import RescuePinModal from "./RescuePinModal";
 
 interface MapViewProps {
   category: HazardCategory;
@@ -124,6 +124,21 @@ export function MapView({ category }: MapViewProps) {
   );
 
   const activePulseFrame = useRef<number | null>(null);
+
+  // Memoize click handler to avoid recreating on every render
+  const handleRescueClickCallback = useCallback(
+    (e: maplibregl.MapLayerMouseEvent) => {
+      const feature = e.features?.[0];
+      const id = feature?.properties?.id as string | undefined;
+      if (!id) return;
+      const pin = rescuePinsRef.current.find((p) => p.id === id) || null;
+      if (pin) {
+        setSelectedRescue(pin);
+        setRescueModalOpen(true);
+      }
+    },
+    [],
+  );
 
   // Initialize map
   useEffect(() => {
@@ -395,18 +410,6 @@ export function MapView({ category }: MapViewProps) {
         });
       }
 
-      const handleRescueClick = (e: maplibregl.MapLayerMouseEvent) => {
-        const feature = e.features?.[0];
-        const id = feature?.properties?.id as string | undefined;
-        if (!id) return;
-        const pin = rescuePinsRef.current.find((p) => p.id === id) || null;
-        if (pin) {
-          setSelectedRescue(pin);
-          setPinMode(false);
-          setDraftCoords(null);
-        }
-      };
-
       const handleEnter = () => {
         mapInstance.getCanvas().style.cursor = "pointer";
       };
@@ -414,32 +417,33 @@ export function MapView({ category }: MapViewProps) {
         mapInstance.getCanvas().style.cursor = "";
       };
 
-      mapInstance.on("click", "rescue-pins", handleRescueClick);
+      mapInstance.on("click", "rescue-pins", handleRescueClickCallback);
       mapInstance.on("mouseenter", "rescue-pins", handleEnter);
       mapInstance.on("mouseleave", "rescue-pins", handleLeave);
 
       return () => {
-        mapInstance.off("click", "rescue-pins", handleRescueClick);
+        mapInstance.off("click", "rescue-pins", handleRescueClickCallback);
         mapInstance.off("mouseenter", "rescue-pins", handleEnter);
         mapInstance.off("mouseleave", "rescue-pins", handleLeave);
       };
     };
 
-    const cleanup = mapInstance.loaded()
-      ? ensureRescueLayer()
-      : mapInstance.once("load", () => {
-          ensureRescueLayer();
-          updateRescueSource(mapInstance);
-        });
+    let cleanup: (() => void) | undefined;
 
     if (mapInstance.loaded()) {
+      cleanup = ensureRescueLayer();
       updateRescueSource(mapInstance);
+    } else {
+      mapInstance.once("load", () => {
+        cleanup = ensureRescueLayer();
+        updateRescueSource(mapInstance);
+      });
     }
 
     return () => {
-      if (typeof cleanup === "function") cleanup();
+      if (cleanup) cleanup();
     };
-  }, []);
+  }, [handleRescueClickCallback]);
 
   useEffect(() => {
     if (!map.current) return;
@@ -974,7 +978,7 @@ export function MapView({ category }: MapViewProps) {
       </div>
 
       {/* Rescue Pin Modal for Create/View */}
-      {rescueModalOpen && draftCoords && (
+      {rescueModalOpen && (draftCoords || selectedRescue) && (
         <RescuePinModal
           open={rescueModalOpen}
           onOpenChange={(open: boolean) => {

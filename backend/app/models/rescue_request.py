@@ -46,8 +46,24 @@ class RescueRequest(Base):
     name = Column(String, nullable=True)
     contact = Column(String, nullable=True)
     household_size = Column(Integer, nullable=True)
-    status = Column(SQLEnum(RescueRequestStatus), nullable=False, default=RescueRequestStatus.OPEN)
-    urgency = Column(SQLEnum(RescueUrgency), nullable=False, default=RescueUrgency.NORMAL)
+    status = Column(
+        SQLEnum(
+            RescueRequestStatus,
+            name="rescuerequeststatus",
+            values_callable=lambda enum_cls: [member.value for member in enum_cls],
+        ),
+        nullable=False,
+        default=RescueRequestStatus.OPEN,
+    )
+    urgency = Column(
+        SQLEnum(
+            RescueUrgency,
+            name="rescuerequesturgency",
+            values_callable=lambda enum_cls: [member.value for member in enum_cls],
+        ),
+        nullable=False,
+        default=RescueUrgency.NORMAL,
+    )
     latitude = Column(Float, nullable=False)
     longitude = Column(Float, nullable=False)
     needs = Column(JSONB, nullable=False, default=dict)
