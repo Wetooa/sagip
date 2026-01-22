@@ -4,7 +4,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.core.config import settings
 from app.core.database import engine, Base
-from app.api import citizen, command, shared, debug
+from app.api import citizen, command, shared, debug, auth
 
 # Create database tables (in production, use Alembic migrations)
 # Base.metadata.create_all(bind=engine)
@@ -26,6 +26,7 @@ app.add_middleware(
 )
 
 # Include routers
+app.include_router(auth.router, prefix=f"{settings.API_PREFIX}/auth", tags=["auth"])
 app.include_router(citizen.router, prefix=f"{settings.API_PREFIX}/citizen", tags=["citizen"])
 app.include_router(command.router, prefix=f"{settings.API_PREFIX}/command", tags=["command"])
 app.include_router(shared.router, prefix=f"{settings.API_PREFIX}/shared", tags=["shared"])

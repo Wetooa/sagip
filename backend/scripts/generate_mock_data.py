@@ -18,6 +18,7 @@ from app.factories import (
     CitizenFactory,
     CensusDataFactory,
     VulnerabilityProfileFactory,
+    FamilyMemberFactory,
     DeviceFactory,
     LoRaDeviceFactory,
     LocationHistoryFactory,
@@ -45,6 +46,7 @@ from app.models import (
     Citizen,
     CensusData,
     VulnerabilityProfile,
+    FamilyMember,
     Device,
     LoRaDevice,
     LocationHistory,
@@ -99,6 +101,7 @@ def generate_data(
         "citizens": (CitizenFactory, Citizen),
         "census_data": (CensusDataFactory, CensusData),
         "vulnerability_profiles": (VulnerabilityProfileFactory, VulnerabilityProfile),
+        "family_members": (FamilyMemberFactory, FamilyMember),
         "devices": (DeviceFactory, Device),
         "lora_devices": (LoRaDeviceFactory, LoRaDevice),
         "location_history": (LocationHistoryFactory, LocationHistory),
@@ -184,7 +187,7 @@ Examples:
   python generate_mock_data.py --citizens 50 --seed 42
 
 Available models:
-  citizens, census-data, vulnerability-profiles, devices, lora-devices,
+  citizens, census-data, vulnerability-profiles, family-members, devices, lora-devices,
   location-history, predicted-locations, incidents, sos-signals, roll-calls,
   roll-call-responses, rescue-dispatches, water-level-readings,
   chatbot-conversations, notifications, mesh-packets, needs-tickets,
@@ -198,6 +201,7 @@ Available models:
         "citizens",
         "census_data",
         "vulnerability_profiles",
+        "family_members",
         "devices",
         "lora_devices",
         "location_history",
@@ -288,6 +292,7 @@ Available models:
             Citizen,
             CensusData,
             VulnerabilityProfile,
+            FamilyMember,
             Device,
             LoRaDevice,
             LocationHistory,
