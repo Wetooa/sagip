@@ -43,6 +43,7 @@ import RescuePinModal from "./RescuePinModal";
 
 interface MapViewProps {
   category: HazardCategory;
+  hideControls?: boolean;
 }
 
 type RescueUrgency = "normal" | "high" | "critical";
@@ -83,7 +84,7 @@ interface RescueFilters {
 const CEBU_CENTER: [number, number] = [123.8854, 10.3157];
 const DEFAULT_ZOOM = 11;
 
-export function MapView({ category }: MapViewProps) {
+export function MapView({ category, hideControls = false }: MapViewProps) {
   const mapContainer = useRef<HTMLDivElement>(null);
   const map = useRef<maplibregl.Map | null>(null);
   const typhoonInteractionsBound = useRef(false);
@@ -171,11 +172,33 @@ export function MapView({ category }: MapViewProps) {
       zoom: DEFAULT_ZOOM,
     });
 
-    // Add navigation controls (compact for mobile)
+    // Add navigation controls (compact for mobile) - positioned left side when hideControls for clean mobile UI
     map.current.addControl(
       new maplibregl.NavigationControl({ showCompass: false }),
-      "top-right",
+      hideControls ? "top-left" : "top-right",
     );
+
+    // If hideControls, add custom positioning CSS to make zoom buttons more visible and move to center-left
+    if (hideControls && mapContainer.current) {
+      const style = document.createElement('style');
+      style.textContent = `
+        .maplibregl-ctrl-top-left .maplibregl-ctrl-zoom-in,
+        .maplibregl-ctrl-top-left .maplibregl-ctrl-zoom-out {
+          width: 36px !important;
+          height: 36px !important;
+        }
+        .maplibregl-ctrl-top-left .maplibregl-ctrl-group {
+          margin: 120px 0 0 10px !important;
+          box-shadow: 0 4px 12px rgba(0,0,0,0.3) !important;
+          border-radius: 8px !important;
+        }
+        .maplibregl-ctrl-top-left,
+        .maplibregl-ctrl-top-right {
+          display: none !important;
+        }
+      `;
+      document.head.appendChild(style);
+    }
 
     // Load flood data
     loadFloodData();
@@ -838,10 +861,11 @@ export function MapView({ category }: MapViewProps) {
     <div className="relative w-full h-full">
       <div ref={mapContainer} className="w-full h-full" />
 
-      {/* Location Search */}
-      <LocationSearch map={map.current} />
+      {/* Location Search - Hidden when hideControls */}
+      {!hideControls && <LocationSearch map={map.current} />}
 
-      {/* Date Picker Popover - Top Right */}
+      {/* Date Picker Popover - Top Right - Hidden when hideControls */}
+      {!hideControls && (
       <div className="absolute top-4 right-16 z-10 flex gap-2">
         <Button
           variant={pinMode ? "default" : "outline"}
@@ -917,8 +941,10 @@ export function MapView({ category }: MapViewProps) {
           />
         </Button>
       </div>
+      )}
 
-      {/* Rescue Filters - Below Controls */}
+      {/* Rescue Filters - Below Controls - Hidden when hideControls */}
+      {!hideControls && (
       <div className="absolute top-20 right-4 z-10 bg-white shadow-lg rounded-lg p-3 max-w-72">
         <div className="flex items-center gap-2 mb-2 text-xs font-semibold text-gray-700">
           <Filter className="h-3 w-3" />
@@ -976,9 +1002,10 @@ export function MapView({ category }: MapViewProps) {
           </div>
         </div>
       </div>
+      )}
 
-      {/* Rescue Pin Modal for Create/View */}
-      {rescueModalOpen && (draftCoords || selectedRescue) && (
+      {/* Rescue Pin Modal for Create/View - Hidden when hideControls */}
+      {!hideControls && rescueModalOpen && (draftCoords || selectedRescue) && (
         <RescuePinModal
           open={rescueModalOpen}
           onOpenChange={(open: boolean) => {
@@ -1031,8 +1058,8 @@ export function MapView({ category }: MapViewProps) {
         />
       )}
 
-      {/* Rescue Pin Detail Popup */}
-      {selectedRescue && !rescueModalOpen && (
+      {/* Rescue Pin Detail Popup - Hidden when hideControls */}
+      {!hideControls && selectedRescue && !rescueModalOpen && (
         <div className="absolute bottom-32 left-4 z-20 bg-white rounded-lg shadow-lg p-4 max-w-sm">
           <div className="flex justify-between items-start mb-3">
             <div>
@@ -1247,8 +1274,8 @@ export function MapView({ category }: MapViewProps) {
         </Button>
       </div>
 
-      {/* Storm List Drawer - Bottom Right */}
-      {storms.length > 0 &&
+      {/* Storm List Drawer - Bottom Right - Hidden when hideControls */}
+      {!hideControls && storms.length > 0 &&
         (category === "storm-surge" || category === "rainfall") && (
           <Drawer open={stormDrawerOpen} onOpenChange={setStormDrawerOpen}>
             <DrawerTrigger asChild>
@@ -1295,8 +1322,8 @@ export function MapView({ category }: MapViewProps) {
           </Drawer>
         )}
 
-      {/* Active Storm Navigation - Bottom Center */}
-      {activeStormId && activeStorm && (
+      {/* Active Storm Navigation - Bottom Center - Hidden when hideControls */}
+      {!hideControls && activeStormId && activeStorm && (
         <div className="absolute inset-x-0 bottom-19 flex justify-center z-30">
           <div className="flex items-center gap-2 bg-white/95 backdrop-blur rounded-full px-3 py-2 shadow-lg border min-w-60">
             <button

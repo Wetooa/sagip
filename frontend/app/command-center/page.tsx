@@ -13,7 +13,6 @@ import {
   TrendingUp,
   Clock,
   Zap,
-  Shield,
   Send,
   X,
   ChevronRight,
@@ -119,20 +118,10 @@ export default function CommandCenter() {
           <div className="flex items-center justify-between">
             {/* Logo & Title */}
             <div className="flex items-center gap-4">
-              <div className="bg-white/10 backdrop-blur-sm p-3 rounded-xl border border-white/20">
-                <Shield className="w-8 h-8 text-[#F4E4C1]" />
-              </div>
-              <div>
-                <h1 className="text-2xl font-bold tracking-wide text-white flex items-center gap-2">
-                  SAGIP <span className="text-[#F4E4C1]">AI</span>
-                  <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-[#F4E4C1]/20 text-[#F4E4C1] border border-[#F4E4C1]/30">
-                    COMMAND CENTER
-                  </span>
-                </h1>
-                <p className="text-sm text-[#F4E4C1]/80">
-                  Government Emergency Operations Dashboard
-                </p>
-              </div>
+              <img src="/logo.png" alt="SAGIP" className="h-8" />
+              <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-[#F4E4C1]/20 text-[#F4E4C1] border border-[#F4E4C1]/30">
+                COMMAND CENTER
+              </span>
             </div>
 
             {/* Real-time Stats & Profile */}
@@ -191,19 +180,19 @@ export default function CommandCenter() {
           />
           <NavButton
             icon={Navigation}
-            label="Rescue"
+            label="Rescue Routes"
             active={activePanel === "rescue"}
             onClick={() => setActivePanel("rescue")}
           />
           <NavButton
             icon={Users}
-            label="Risk Tracking"
+            label="Roll Call"
             active={activePanel === "rollcall"}
             onClick={() => setActivePanel("rollcall")}
           />
           <NavButton
             icon={Activity}
-            label="Analytics"
+            label="AI Analytics"
             active={activePanel === "analytics"}
             onClick={() => setActivePanel("analytics")}
           />
@@ -237,7 +226,7 @@ export default function CommandCenter() {
               />
               <StatCard
                 icon={Users}
-                label="At Risk"
+                label="People Tracked"
                 value={peopleTracked}
                 color="text-green-500"
                 bgColor="bg-green-500/10"
