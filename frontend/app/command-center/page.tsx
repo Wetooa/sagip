@@ -27,6 +27,7 @@ import RescueRoutes from "@/components/CommandCenter/RescueRoutes";
 import RollCall from "@/components/CommandCenter/RollCall";
 import AIAnalytics from "@/components/CommandCenter/AIAnalytics";
 import AIChatbot from "@/components/CommandCenter/AIChatbot";
+import type { DriftPredictionPin } from "@/app/page";
 
 type Panel =
   | "hazard"
@@ -48,6 +49,7 @@ export default function CommandCenter() {
   const [activePanel, setActivePanel] = useState<Panel>("hazard");
   const [isChatbotOpen, setIsChatbotOpen] = useState(false);
   const [isProfileOpen, setIsProfileOpen] = useState(false);
+  const [driftPin, setDriftPin] = useState<DriftPredictionPin | null>(null);
   const [sosAlerts, setSOSAlerts] = useState<SOSAlert[]>([
     {
       id: "1",
@@ -75,6 +77,28 @@ export default function CommandCenter() {
   const [activeRescues, setActiveRescues] = useState(12);
   const [peopleTracked, setPeopleTracked] = useState(1247);
 
+  // Load drift pin from localStorage
+  useEffect(() => {
+    const stored = localStorage.getItem("urgentHelpLostSignal");
+    if (stored) {
+      try {
+        const pin: DriftPredictionPin = JSON.parse(stored);
+        // Check if expired
+        if (pin.expiresAt > Date.now()) {
+          // Use a callback to avoid setState during render
+          queueMicrotask(() => {
+            setDriftPin(pin);
+          });
+        } else {
+          // Expired, clean up
+          localStorage.removeItem("urgentHelpLostSignal");
+        }
+      } catch (e) {
+        console.error("Failed to parse drift pin from localStorage:", e);
+      }
+    }
+  }, []);
+
   useEffect(() => {
     // Simulate real-time updates
     const interval = setInterval(() => {
@@ -89,7 +113,7 @@ export default function CommandCenter() {
   const renderPanel = () => {
     switch (activePanel) {
       case "hazard":
-        return <HazardMapping />;
+        return <HazardMapping driftPin={driftPin} />;
       case "lora":
         return <LoRaPanel alerts={sosAlerts} />;
       case "rescue":
@@ -101,7 +125,7 @@ export default function CommandCenter() {
       case "profile":
         return <ProfilePanel />;
       default:
-        return <HazardMapping />;
+        return <HazardMapping driftPin={driftPin} />;
     }
   };
 

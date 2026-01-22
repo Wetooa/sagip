@@ -14,6 +14,8 @@ import {
   Cross,
   Route,
 } from "lucide-react";
+import { DriftPredictionModal } from "@/components/DriftPredictionModal";
+import type { DriftPredictionPin } from "@/app/page";
 
 const CEBU_CENTER: [number, number] = [123.8854, 10.3157];
 const DEFAULT_ZOOM = 11;
@@ -33,12 +35,17 @@ interface FloodGeoJSON {
   features: any[];
 }
 
-export default function HazardMapping() {
+interface HazardMappingProps {
+  driftPin?: DriftPredictionPin | null;
+}
+
+export default function HazardMapping({ driftPin }: HazardMappingProps) {
   const mapContainer = useRef<HTMLDivElement>(null);
   const map = useRef<maplibregl.Map | null>(null);
   const [activeLayer, setActiveLayer] = useState<HazardLayer>("flood");
   const [isLoading, setIsLoading] = useState(true);
   const [floodData, setFloodData] = useState<FloodGeoJSON | null>(null);
+  const [showDriftModal, setShowDriftModal] = useState(false);
 
   // Load flood data from API
   useEffect(() => {
@@ -132,6 +139,160 @@ export default function HazardMapping() {
       addFloodLayer(mapInstance);
     }
   }, [floodData]);
+
+  // Add drift prediction layer
+  useEffect(() => {
+    if (!map.current) return;
+
+    const mapInstance = map.current;
+
+    const setupDriftLayer = () => {
+      if (!mapInstance) return;
+
+      try {
+        // Remove existing drift layer if it exists
+        if (mapInstance.getLayer("drift-predictions")) {
+          mapInstance.removeLayer("drift-predictions");
+        }
+        if (mapInstance.getSource("drift-predictions")) {
+          mapInstance.removeSource("drift-predictions");
+        }
+        if (mapInstance.getLayer("drift-predictions-radius")) {
+          mapInstance.removeLayer("drift-predictions-radius");
+        }
+        if (mapInstance.getSource("drift-predictions-radius")) {
+          mapInstance.removeSource("drift-predictions-radius");
+        }
+      } catch (e) {
+        // Map may be unloading, ignore
+      }
+
+      if (!driftPin) return;
+
+      try {
+        // Add drift predictions source
+        mapInstance.addSource("drift-predictions", {
+          type: "geojson",
+          data: {
+            type: "FeatureCollection",
+            features: [
+              {
+                type: "Feature",
+                geometry: {
+                  type: "Point",
+                  coordinates: [driftPin.longitude, driftPin.latitude],
+                },
+                properties: {
+                  radius: driftPin.radius,
+                  timestamp: driftPin.timestamp,
+                  expiresAt: driftPin.expiresAt,
+                },
+              },
+            ],
+          },
+        });
+
+        // Add circle layer for the drift prediction point
+        mapInstance.addLayer({
+          id: "drift-predictions",
+          type: "circle",
+          source: "drift-predictions",
+          paint: {
+            "circle-radius": 10,
+            "circle-color": "#8b5cf6",
+            "circle-stroke-color": "#8b5cf6",
+            "circle-stroke-width": 2,
+            "circle-opacity": 0.7,
+          },
+        });
+
+        // Add radius circle layer (larger, semi-transparent)
+        mapInstance.addSource("drift-predictions-radius", {
+          type: "geojson",
+          data: {
+            type: "FeatureCollection",
+            features: [
+              {
+                type: "Feature",
+                geometry: {
+                  type: "Point",
+                  coordinates: [driftPin.longitude, driftPin.latitude],
+                },
+                properties: {},
+              },
+            ],
+          },
+        });
+
+        mapInstance.addLayer({
+          id: "drift-predictions-radius",
+          type: "circle",
+          source: "drift-predictions-radius",
+          paint: {
+            "circle-radius": [
+              "interpolate",
+              ["linear"],
+              ["zoom"],
+              11,
+              driftPin.radius / 100,
+              15,
+              driftPin.radius / 50,
+            ],
+            "circle-color": "#8b5cf6",
+            "circle-opacity": 0.2,
+            "circle-stroke-color": "#8b5cf6",
+            "circle-stroke-width": 1,
+            "circle-stroke-opacity": 0.5,
+          },
+        });
+
+        // Add click handler to show modal
+        const handleDriftClick = () => {
+          setShowDriftModal(true);
+        };
+
+        const handleDriftEnter = () => {
+          if (mapInstance) mapInstance.getCanvas().style.cursor = "pointer";
+        };
+
+        const handleDriftLeave = () => {
+          if (mapInstance) mapInstance.getCanvas().style.cursor = "";
+        };
+
+        mapInstance.on("click", "drift-predictions", handleDriftClick);
+        mapInstance.on("mouseenter", "drift-predictions", handleDriftEnter);
+        mapInstance.on("mouseleave", "drift-predictions", handleDriftLeave);
+
+        return () => {
+          if (!mapInstance) return;
+          try {
+            mapInstance.off("click", "drift-predictions", handleDriftClick);
+            mapInstance.off("mouseenter", "drift-predictions", handleDriftEnter);
+            mapInstance.off("mouseleave", "drift-predictions", handleDriftLeave);
+          } catch (e) {
+            // Map may be unloading, ignore
+          }
+        };
+      } catch (e) {
+        console.error("Error setting up drift layer:", e);
+      }
+    };
+
+    if (mapInstance.loaded()) {
+      return setupDriftLayer();
+    } else {
+      const handleLoad = () => {
+        const cleanup = setupDriftLayer();
+        if (cleanup) {
+          return cleanup;
+        }
+      };
+      mapInstance.once("load", handleLoad);
+      return () => {
+        mapInstance.off("load", handleLoad);
+      };
+    }
+  }, [driftPin]);
 
   const addFloodLayer = (mapInstance: maplibregl.Map) => {
     if (!floodData) return;
@@ -639,6 +800,18 @@ export default function HazardMapping() {
           height: "100%",
         }}
       />
+
+      {/* Drift Prediction Modal */}
+      {driftPin && (
+        <DriftPredictionModal
+          open={showDriftModal}
+          onClose={() => setShowDriftModal(false)}
+          latitude={driftPin.latitude}
+          longitude={driftPin.longitude}
+          radius={driftPin.radius}
+          expiresAt={driftPin.expiresAt}
+        />
+      )}
 
       {/* Loading Overlay */}
       {isLoading && (

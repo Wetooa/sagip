@@ -19,6 +19,14 @@ export type HazardCategory =
   | "facilities"
   | "roads";
 
+export interface DriftPredictionPin {
+  latitude: number;
+  longitude: number;
+  radius: number;
+  timestamp: number;
+  expiresAt: number;
+}
+
 export default function Home() {
   // Renamed from RootLayout to Home
   const [selectedCategory, setSelectedCategory] =
@@ -34,6 +42,41 @@ export default function Home() {
     loraDevice: false,
   });
   const [modal, setModal] = useState<DebugModalType>(null);
+  const [driftPin, setDriftPin] = useState<DriftPredictionPin | null>(null);
+
+  // Load drift pin from localStorage on mount
+  useEffect(() => {
+    const stored = localStorage.getItem("urgentHelpLostSignal");
+    if (stored) {
+      try {
+        const pin: DriftPredictionPin = JSON.parse(stored);
+        // Check if expired
+        if (pin.expiresAt > Date.now()) {
+          setDriftPin(pin);
+        } else {
+          // Expired, clean up
+          localStorage.removeItem("urgentHelpLostSignal");
+        }
+      } catch (e) {
+        console.error("Failed to parse drift pin from localStorage:", e);
+      }
+    }
+  }, []);
+
+  // Check drift pin expiry periodically
+  useEffect(() => {
+    if (!driftPin) return;
+
+    const checkExpiry = () => {
+      if (driftPin.expiresAt <= Date.now()) {
+        setDriftPin(null);
+        localStorage.removeItem("urgentHelpLostSignal");
+      }
+    };
+
+    const interval = setInterval(checkExpiry, 60000); // Check every minute
+    return () => clearInterval(interval);
+  }, [driftPin]);
 
   // User flow logic
   useEffect(() => {
@@ -54,6 +97,25 @@ export default function Home() {
 
   // Handle modal transitions based on user flow
   const handleStatus = (status: string) => {
+    if (status === "drift-triggered") {
+      // Create drift pin with random radius (50-500 meters)
+      const randomRadius = Math.floor(Math.random() * 450) + 50;
+      const now = Date.now();
+      const expiresAt = now + 24 * 60 * 60 * 1000; // 24 hours from now
+
+      const newDriftPin: DriftPredictionPin = {
+        latitude: 10.515794365028029,
+        longitude: 124.0266410381405,
+        radius: randomRadius,
+        timestamp: now,
+        expiresAt,
+      };
+
+      setDriftPin(newDriftPin);
+      localStorage.setItem("urgentHelpLostSignal", JSON.stringify(newDriftPin));
+      return;
+    }
+
     if (!debug.phoneDead) {
       // PHONE ALIVE FLOW
       if (status === "yes") {
@@ -124,7 +186,32 @@ export default function Home() {
             onCategoryChange={setSelectedCategory}
           />
           {/* Debug Panel Floating */}
-          <DebugPanel onChange={setDebug} onLoraSOS={handleLoraSOS} />
+          <DebugPanel
+            onChange={setDebug}
+            onLoraSOS={handleLoraSOS}
+            driftPin={driftPin}
+            onTriggerDrift={() => {
+              const randomRadius = Math.floor(Math.random() * 450) + 50;
+              const now = Date.now();
+              const expiresAt = now + 24 * 60 * 60 * 1000;
+              const newDriftPin: DriftPredictionPin = {
+                latitude: 10.515794365028029,
+                longitude: 124.0266410381405,
+                radius: randomRadius,
+                timestamp: now,
+                expiresAt,
+              };
+              setDriftPin(newDriftPin);
+              localStorage.setItem(
+                "urgentHelpLostSignal",
+                JSON.stringify(newDriftPin)
+              );
+            }}
+            onDeleteDrift={() => {
+              setDriftPin(null);
+              localStorage.removeItem("urgentHelpLostSignal");
+            }}
+          />
           <DebugModals
             modal={modal}
             setModal={setModal}
