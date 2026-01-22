@@ -3,6 +3,7 @@ from app.factories.citizen import (
     CitizenFactory,
     CensusDataFactory,
     VulnerabilityProfileFactory,
+    FamilyMemberFactory,
 )
 from app.factories.devices import DeviceFactory, LoRaDeviceFactory
 from app.factories.location import LocationHistoryFactory, PredictedLocationFactory
@@ -37,6 +38,7 @@ __all__ = [
     "CitizenFactory",
     "CensusDataFactory",
     "VulnerabilityProfileFactory",
+    "FamilyMemberFactory",
     "DeviceFactory",
     "LoRaDeviceFactory",
     "LocationHistoryFactory",

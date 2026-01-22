@@ -177,7 +177,7 @@ class CrowdsourcedHazardFactory(BaseFactory):
     class Meta:
         model = CrowdsourcedHazard
 
-    reporter_citizen = factory.SubFactory(CitizenFactory) if fake.boolean(chance_of_getting_true=80) else None
+    reporter = factory.SubFactory(CitizenFactory) if fake.boolean(chance_of_getting_true=80) else None
     hazard_type = factory.Iterator([
         HazardType.FLOOD,
         HazardType.LANDSLIDE,

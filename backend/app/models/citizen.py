@@ -9,6 +9,7 @@ from sqlalchemy import (
     Boolean,
     Text,
     DateTime,
+    Date,
     Float,
     ForeignKey,
     Enum as SQLEnum,
@@ -17,6 +18,7 @@ from sqlalchemy import (
 )
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
+from sqlalchemy.orm import relationship as sa_relationship
 import enum
 
 from app.core.database import Base
@@ -96,6 +98,9 @@ class CensusData(Base):
     barangay = Column(String, nullable=False, index=True)
     city = Column(String, nullable=False)
     province = Column(String, nullable=False)
+    government_id = Column(String, nullable=True)
+    birth_date = Column(Date, nullable=True)
+    has_vulnerable_family_member = Column(Boolean, nullable=False, default=False)
     additional_info = Column(JSON, nullable=True)
     submitted_at = Column(DateTime, nullable=False, default=datetime.utcnow)
     created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
@@ -109,6 +114,11 @@ class CensusData(Base):
         "VulnerabilityProfile",
         back_populates="census_data",
         uselist=False,
+        cascade="all, delete-orphan",
+    )
+    family_members = relationship(
+        "FamilyMember",
+        back_populates="census_data",
         cascade="all, delete-orphan",
     )
 
@@ -137,3 +147,28 @@ class VulnerabilityProfile(Base):
     # Relationships
     citizen = relationship("Citizen", back_populates="vulnerability_profiles")
     census_data = relationship("CensusData", back_populates="vulnerability_profile")
+
+
+class FamilyMember(Base):
+    """Family member model for census data."""
+
+    __tablename__ = "family_members"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    census_data_id = Column(
+        UUID(as_uuid=True), ForeignKey("census_data.id"), nullable=False, index=True
+    )
+    full_name = Column(String, nullable=False)
+    relationship = Column(String, nullable=False)  # e.g., "spouse", "child", "parent", "sibling"
+    age = Column(Integer, nullable=True)
+    government_id = Column(String, nullable=True)
+    is_vulnerable = Column(Boolean, nullable=False, default=False, index=True)
+    vulnerability_type = Column(String, nullable=True)  # e.g., "elderly", "PWD", "bed-ridden", "sickly"
+    medical_conditions = Column(Text, nullable=True)
+    created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+    updated_at = Column(
+        DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow
+    )
+
+    # Relationships
+    census_data = sa_relationship("CensusData", back_populates="family_members")

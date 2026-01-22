@@ -10,6 +10,13 @@ interface TimelineControlProps {
   onPlay: () => void;
   onPause: () => void;
   onReset: () => void;
+  onStepBack: () => void;
+  onStepForward: () => void;
+  manualDate: string;
+  manualTime: string;
+  onManualDateChange: (value: string) => void;
+  onManualTimeChange: (value: string) => void;
+  onManualApply: () => void;
 }
 
 export default function TimelineControl({
@@ -20,8 +27,15 @@ export default function TimelineControl({
   onPlay,
   onPause,
   onReset,
+  onStepBack,
+  onStepForward,
+  manualDate,
+  manualTime,
+  onManualDateChange,
+  onManualTimeChange,
+  onManualApply,
 }: TimelineControlProps) {
-  if (!typhoonData) return null;
+  if (!typhoonData || typhoonData.track.length === 0) return null;
 
   const currentPoint = typhoonData.track[currentIndex];
   const startDate = new Date(typhoonData.track[0].date);
@@ -31,13 +45,70 @@ export default function TimelineControl({
   const currentDate = new Date(currentPoint.date);
 
   return (
-    <div className="absolute bottom-8 left-1/2 -translate-x-1/2 bg-white p-5 rounded-lg shadow-lg z-10 min-w-[500px]">
-      <h3 className="m-0 mb-2.5 text-base text-center">
-        Typhoon Timeline:{" "}
-        <span className="font-bold text-red-600">
-          {currentDate.toLocaleString()}
-        </span>
-      </h3>
+    <div
+      className="absolute bottom-6 left-1/2 -translate-x-1/2 bg-white/95 backdrop-blur px-5 py-4 rounded-xl shadow-lg z-10 border border-gray-200"
+      style={{ minWidth: 620 }}
+    >
+      <div className="flex items-center justify-between mb-3">
+        <div className="flex items-center gap-2">
+          <button
+            onClick={isPlaying ? onPause : onPlay}
+            className="px-3 py-2 bg-blue-600 text-white rounded shadow hover:bg-blue-700"
+            aria-label={isPlaying ? "Pause" : "Play"}
+          >
+            {isPlaying ? "⏸" : "▶"}
+          </button>
+          <button
+            onClick={onStepBack}
+            className="px-3 py-2 bg-gray-200 rounded hover:bg-gray-300"
+            aria-label="Step backward"
+          >
+            «
+          </button>
+        </div>
+        <div className="flex items-center gap-2 text-sm">
+          <div className="flex flex-col items-center">
+            <span className="uppercase text-xs text-gray-500">Date</span>
+            <div className="flex items-center gap-2">
+              <input
+                type="date"
+                value={manualDate}
+                onChange={(e) => onManualDateChange(e.target.value)}
+                className="border rounded px-2 py-1 text-sm"
+              />
+              <input
+                type="time"
+                value={manualTime}
+                onChange={(e) => onManualTimeChange(e.target.value)}
+                className="border rounded px-2 py-1 text-sm"
+                step={300}
+              />
+              <button
+                onClick={onManualApply}
+                className="px-3 py-1.5 bg-blue-600 text-white rounded shadow hover:bg-blue-700"
+              >
+                Go
+              </button>
+            </div>
+          </div>
+        </div>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={onStepForward}
+            className="px-3 py-2 bg-gray-200 rounded hover:bg-gray-300"
+            aria-label="Step forward"
+          >
+            »
+          </button>
+          <button
+            onClick={onReset}
+            className="px-3 py-2 bg-gray-100 rounded hover:bg-gray-200"
+          >
+            ⏮
+          </button>
+        </div>
+      </div>
+
       <div className="flex items-center gap-4 mb-2.5">
         <span className="text-sm">{startDate.toLocaleDateString()}</span>
         <input
@@ -50,28 +121,10 @@ export default function TimelineControl({
         />
         <span className="text-sm">{endDate.toLocaleDateString()}</span>
       </div>
-      <div className="flex justify-center gap-2.5 mt-2.5">
-        <button
-          onClick={onPlay}
-          disabled={isPlaying}
-          className="px-4 py-2 bg-blue-600 text-white border-none rounded cursor-pointer text-sm hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed"
-        >
-          ▶ Play
-        </button>
-        <button
-          onClick={onPause}
-          disabled={!isPlaying}
-          className="px-4 py-2 bg-blue-600 text-white border-none rounded cursor-pointer text-sm hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed"
-        >
-          ⏸ Pause
-        </button>
-        <button
-          onClick={onReset}
-          className="px-4 py-2 bg-blue-600 text-white border-none rounded cursor-pointer text-sm hover:bg-blue-700"
-        >
-          ⏮ Reset
-        </button>
-      </div>
+      <p className="text-center text-sm text-gray-700 m-0">
+        Current:{" "}
+        <span className="font-semibold">{currentDate.toLocaleString()}</span>
+      </p>
     </div>
   );
 }

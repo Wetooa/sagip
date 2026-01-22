@@ -35,14 +35,18 @@ class BaseFactory(SQLAlchemyModelFactory):
 def get_philippine_coordinates():
     """Generate coordinates within Philippines bounds."""
     # Philippines approximate bounds: 4.6°N to 19.0°N, 116.9°E to 126.6°E
-    latitude = fake.latitude() * 0.5 + 12.0  # Center around 12°N
-    longitude = fake.longitude() * 0.3 + 121.5  # Center around 121.5°E
+    # Convert to float to avoid Decimal/float type issues
+    lat = float(fake.latitude())
+    lon = float(fake.longitude())
+    
+    latitude = lat * 0.5 + 12.0  # Center around 12°N
+    longitude = lon * 0.3 + 121.5  # Center around 121.5°E
     
     # Ensure within bounds
     latitude = max(4.6, min(19.0, latitude))
     longitude = max(116.9, min(126.6, longitude))
     
-    return latitude, longitude
+    return float(latitude), float(longitude)
 
 
 def get_philippine_phone():

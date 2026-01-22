@@ -1,6 +1,8 @@
-# NOAH hazard mapping data
-data/noah/
-data/cache/
+# Data directory - all data files should be ignored
+data
+
+# GeoJSON files
+*.geojson
 
 # Shapefiles
 *.shp

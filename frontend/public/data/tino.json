@@ -1,0 +1,828 @@
+{
+  "id": "kalmaegi-2025",
+  "name": "Kalmaegi (Tino)",
+  "title": "Typhoon Kalmaegi (Tino)",
+  "description": "Typhoon",
+  "season": "2025",
+  "type": "Typhoon",
+  "max": 38,
+  "forecast": 38,
+  "ja": 25,
+  "ph": "tino",
+  "agencies": "JTWC",
+  "track": [
+    {
+      "date": "2025-11-01T06:00:00Z",
+      "coordinates": [138.1, 9.8],
+      "wind": 25,
+      "pressure": 1002,
+      "basin": "WP",
+      "forecast": false,
+      "rank": -1,
+      "code": "D",
+      "description": "Tropical Depression"
+    },
+    {
+      "date": "2025-11-01T09:00:00Z",
+      "coordinates": [137.6, 10],
+      "wind": 27,
+      "pressure": 1002,
+      "basin": "WP",
+      "forecast": false,
+      "rank": -1,
+      "code": "D",
+      "description": "Tropical Depression",
+      "spline": [
+        [138.1, 9.8],
+        [137.789761, 9.920989],
+        [137.6, 10]
+      ]
+    },
+    {
+      "date": "2025-11-01T12:00:00Z",
+      "coordinates": [137.2, 10.2],
+      "wind": 29,
+      "pressure": 1001,
+      "basin": "WP",
+      "forecast": false,
+      "rank": -1,
+      "code": "D",
+      "description": "Tropical Depression",
+      "spline": [
+        [137.6, 10],
+        [137.4605, 10.065863],
+        [137.2, 10.2]
+      ]
+    },
+    {
+      "date": "2025-11-01T15:00:00Z",
+      "coordinates": [136.8, 10.4],
+      "wind": 34,
+      "pressure": 1001,
+      "basin": "WP",
+      "forecast": false,
+      "rank": 0,
+      "code": "S",
+      "description": "Tropical Storm"
+    },
+    {
+      "date": "2025-11-01T18:00:00Z",
+      "coordinates": [136.4, 10.6],
+      "wind": 39,
+      "pressure": 1000,
+      "basin": "WP",
+      "forecast": false,
+      "rank": 0,
+      "code": "S",
+      "description": "Tropical Storm",
+      "spline": [
+        [136.8, 10.4],
+        [136.545103, 10.542985],
+        [136.474541, 10.574257],
+        [136.4, 10.6]
+      ]
+    },
+    {
+      "date": "2025-11-01T21:00:00Z",
+      "coordinates": [135.8, 10.7],
+      "wind": 42,
+      "pressure": 1000,
+      "basin": "WP",
+      "forecast": false,
+      "rank": 0,
+      "code": "S",
+      "description": "Tropical Storm",
+      "spline": [
+        [136.4, 10.6],
+        [136.308397, 10.623695],
+        [136.201048, 10.644205],
+        [135.8, 10.7]
+      ]
+    },
+    {
+      "date": "2025-11-02T00:00:00Z",
+      "coordinates": [135.1, 10.8],
+      "wind": 45,
+      "pressure": 1000,
+      "basin": "WP",
+      "forecast": false,
+      "rank": 0,
+      "code": "S",
+      "description": "Tropical Storm",
+      "spline": [
+        [135.8, 10.7],
+        [135.345829, 10.752087],
+        [135.212218, 10.774808],
+        [135.1, 10.8]
+      ]
+    },
+    {
+      "date": "2025-11-02T03:00:00Z",
+      "coordinates": [134.2, 11.1],
+      "wind": 48,
+      "pressure": 997,
+      "basin": "WP",
+      "forecast": false,
+      "rank": 0,
+      "code": "S",
+      "description": "Tropical Storm",
+      "spline": [
+        [135.1, 10.8],
+        [134.901141, 10.858878],
+        [134.421427, 11.030442],
+        [134.2, 11.1]
+      ]
+    },
+    {
+      "date": "2025-11-02T06:00:00Z",
+      "coordinates": [133.3, 11.3],
+      "wind": 51,
+      "pressure": 994,
+      "basin": "WP",
+      "forecast": false,
+      "rank": 0,
+      "code": "S",
+      "description": "Tropical Storm",
+      "spline": [
+        [134.2, 11.1],
+        [133.992309, 11.154818],
+        [133.780165, 11.205003],
+        [133.550337, 11.253308],
+        [133.3, 11.3]
+      ]
+    },
+    {
+      "date": "2025-11-02T09:00:00Z",
+      "coordinates": [132.5, 11.4],
+      "wind": 53,
+      "pressure": 994,
+      "basin": "WP",
+      "forecast": false,
+      "rank": 1,
+      "code": "SS",
+      "description": "Severe Tropical Storm",
+      "spline": [
+        [133.3, 11.3],
+        [133.009542, 11.350773],
+        [132.819617, 11.378656],
+        [132.654413, 11.394709],
+        [132.5, 11.4]
+      ]
+    },
+    {
+      "date": "2025-11-02T12:00:00Z",
+      "coordinates": [131.8, 11.3],
+      "wind": 54,
+      "pressure": 993,
+      "basin": "WP",
+      "forecast": false,
+      "rank": 1,
+      "code": "SS",
+      "description": "Severe Tropical Storm",
+      "spline": [
+        [132.5, 11.4],
+        [132.393823, 11.396336],
+        [132.28674, 11.385123],
+        [132.174174, 11.366475],
+        [131.938022, 11.320807],
+        [131.8, 11.3]
+      ]
+    },
+    {
+      "date": "2025-11-02T15:00:00Z",
+      "coordinates": [130.9, 11.2],
+      "wind": 57,
+      "pressure": 993,
+      "basin": "WP",
+      "forecast": false,
+      "rank": 1,
+      "code": "SS",
+      "description": "Severe Tropical Storm",
+      "spline": [
+        [131.8, 11.3],
+        [131.173358, 11.238213],
+        [131.026774, 11.219945],
+        [130.9, 11.2]
+      ]
+    },
+    {
+      "date": "2025-11-02T18:00:00Z",
+      "coordinates": [130.1, 11],
+      "wind": 60,
+      "pressure": 993,
+      "basin": "WP",
+      "forecast": false,
+      "rank": 1,
+      "code": "SS",
+      "description": "Severe Tropical Storm",
+      "spline": [
+        [130.9, 11.2],
+        [130.665812, 11.155144],
+        [130.461439, 11.108444],
+        [130.284893, 11.060298],
+        [130.1, 11]
+      ]
+    },
+    {
+      "date": "2025-11-02T21:00:00Z",
+      "coordinates": [129.5, 10.7],
+      "wind": 65,
+      "pressure": 989,
+      "basin": "WP",
+      "forecast": false,
+      "rank": 2,
+      "code": "T",
+      "description": "Typhoon",
+      "spline": [
+        [130.1, 11],
+        [130.008911, 10.964032],
+        [129.922204, 10.923422],
+        [129.634115, 10.764094],
+        [129.5, 10.7]
+      ]
+    },
+    {
+      "date": "2025-11-03T00:00:00Z",
+      "coordinates": [128.9, 10.5],
+      "wind": 70,
+      "pressure": 985,
+      "basin": "WP",
+      "forecast": false,
+      "rank": 2,
+      "code": "T",
+      "description": "Typhoon",
+      "spline": [
+        [129.5, 10.7],
+        [129.346348, 10.638902],
+        [129.199913, 10.586846],
+        [129.043305, 10.538356],
+        [128.9, 10.5]
+      ]
+    },
+    {
+      "date": "2025-11-03T03:00:00Z",
+      "coordinates": [128.3, 10.4],
+      "wind": 75,
+      "pressure": 980,
+      "basin": "WP",
+      "forecast": false,
+      "rank": 2,
+      "code": "T",
+      "description": "Typhoon",
+      "spline": [
+        [128.9, 10.5],
+        [128.741229, 10.463437],
+        [128.5909, 10.435371],
+        [128.452415, 10.415576],
+        [128.3, 10.4]
+      ]
+    },
+    {
+      "date": "2025-11-03T06:00:00Z",
+      "coordinates": [127.7, 10.4],
+      "wind": 80,
+      "pressure": 975,
+      "basin": "WP",
+      "forecast": false,
+      "rank": 2,
+      "code": "T",
+      "description": "Typhoon",
+      "spline": [
+        [128.3, 10.4],
+        [128.138143, 10.38977],
+        [127.999827, 10.386875],
+        [127.853387, 10.390131],
+        [127.7, 10.4]
+      ]
+    },
+    {
+      "date": "2025-11-03T09:00:00Z",
+      "coordinates": [127.1, 10.5],
+      "wind": 85,
+      "pressure": 972,
+      "basin": "WP",
+      "forecast": false,
+      "rank": 2,
+      "code": "T",
+      "description": "Typhoon",
+      "spline": [
+        [127.7, 10.4],
+        [127.531124, 10.421514],
+        [127.241573, 10.476886],
+        [127.1, 10.5]
+      ]
+    },
+    {
+      "date": "2025-11-03T12:00:00Z",
+      "coordinates": [126.3, 10.6],
+      "wind": 89,
+      "pressure": 968,
+      "basin": "WP",
+      "forecast": false,
+      "rank": 2,
+      "code": "T",
+      "description": "Typhoon",
+      "spline": [
+        [127.1, 10.5],
+        [126.972634, 10.515194],
+        [126.581125, 10.552177],
+        [126.432702, 10.573902],
+        [126.3, 10.6]
+      ]
+    },
+    {
+      "date": "2025-11-03T15:00:00Z",
+      "coordinates": [125.3, 10.9],
+      "wind": 85,
+      "pressure": 978,
+      "basin": "WP",
+      "forecast": false,
+      "rank": 2,
+      "code": "T",
+      "description": "Typhoon",
+      "spline": [
+        [126.3, 10.6],
+        [126.177893, 10.630022],
+        [126.044031, 10.668165],
+        [125.53047, 10.832895],
+        [125.3, 10.9]
+      ]
+    },
+    {
+      "date": "2025-11-03T18:00:00Z",
+      "coordinates": [124.4, 11.1],
+      "wind": 80,
+      "pressure": 987,
+      "basin": "WP",
+      "forecast": false,
+      "rank": 2,
+      "code": "T",
+      "description": "Typhoon",
+      "spline": [
+        [125.3, 10.9],
+        [124.882152, 11.017274],
+        [124.71099, 11.060115],
+        [124.625481, 11.07741],
+        [124.536564, 11.091036],
+        [124.466801, 11.097716],
+        [124.4, 11.1]
+      ]
+    },
+    {
+      "date": "2025-11-03T21:00:00Z",
+      "coordinates": [123.8, 10.9],
+      "wind": 75,
+      "pressure": 987,
+      "basin": "WP",
+      "forecast": false,
+      "rank": 2,
+      "code": "T",
+      "description": "Typhoon",
+      "spline": [
+        [124.4, 11.1],
+        [124.322446, 11.096524],
+        [124.270988, 11.090011],
+        [124.212208, 11.078001],
+        [124.149425, 11.059537],
+        [124.056839, 11.022439],
+        [123.8, 10.9]
+      ]
+    },
+    {
+      "date": "2025-11-04T00:00:00Z",
+      "coordinates": [123.2, 10.6],
+      "wind": 70,
+      "pressure": 987,
+      "basin": "WP",
+      "forecast": false,
+      "rank": 2,
+      "code": "T",
+      "description": "Typhoon",
+      "spline": [
+        [123.8, 10.9],
+        [123.664334, 10.836175],
+        [123.356375, 10.669568],
+        [123.27558, 10.631339],
+        [123.2, 10.6]
+      ]
+    },
+    {
+      "date": "2025-11-04T03:00:00Z",
+      "coordinates": [122.5, 10.4],
+      "wind": 70,
+      "pressure": 986,
+      "basin": "WP",
+      "forecast": false,
+      "rank": 2,
+      "code": "T",
+      "description": "Typhoon",
+      "spline": [
+        [123.2, 10.6],
+        [122.993759, 10.524478],
+        [122.816797, 10.468704],
+        [122.655534, 10.428094],
+        [122.5, 10.4]
+      ]
+    },
+    {
+      "date": "2025-11-04T06:00:00Z",
+      "coordinates": [121.8, 10.4],
+      "wind": 70,
+      "pressure": 985,
+      "basin": "WP",
+      "forecast": false,
+      "rank": 2,
+      "code": "T",
+      "description": "Typhoon",
+      "spline": [
+        [122.5, 10.4],
+        [122.357503, 10.385163],
+        [122.204304, 10.37982],
+        [122.024248, 10.384249],
+        [121.8, 10.4]
+      ]
+    },
+    {
+      "date": "2025-11-04T09:00:00Z",
+      "coordinates": [121.3, 10.5],
+      "wind": 70,
+      "pressure": 985,
+      "basin": "WP",
+      "forecast": false,
+      "rank": 2,
+      "code": "T",
+      "description": "Typhoon",
+      "spline": [
+        [121.8, 10.4],
+        [121.708559, 10.41015],
+        [121.616436, 10.425824],
+        [121.3, 10.5]
+      ]
+    },
+    {
+      "date": "2025-11-04T12:00:00Z",
+      "coordinates": [120.8, 10.6],
+      "wind": 70,
+      "pressure": 984,
+      "basin": "WP",
+      "forecast": false,
+      "rank": 2,
+      "code": "T",
+      "description": "Typhoon"
+    },
+    {
+      "date": "2025-11-04T15:00:00Z",
+      "coordinates": [120.3, 10.7],
+      "wind": 70,
+      "pressure": 982,
+      "basin": "WP",
+      "forecast": false,
+      "rank": 2,
+      "code": "T",
+      "description": "Typhoon",
+      "spline": [
+        [120.8, 10.6],
+        [120.460886, 10.658489],
+        [120.371363, 10.678911],
+        [120.3, 10.7]
+      ]
+    },
+    {
+      "date": "2025-11-04T18:00:00Z",
+      "coordinates": [119.9, 10.9],
+      "wind": 70,
+      "pressure": 980,
+      "basin": "WP",
+      "forecast": false,
+      "rank": 2,
+      "code": "T",
+      "description": "Typhoon",
+      "spline": [
+        [120.3, 10.7],
+        [120.21353, 10.732612],
+        [120.128227, 10.772023],
+        [120.043179, 10.817378],
+        [119.9, 10.9]
+      ]
+    },
+    {
+      "date": "2025-11-04T21:00:00Z",
+      "coordinates": [119.6, 11.1],
+      "wind": 72,
+      "pressure": 980,
+      "basin": "WP",
+      "forecast": false,
+      "rank": 2,
+      "code": "T",
+      "description": "Typhoon",
+      "spline": [
+        [119.9, 10.9],
+        [119.822788, 10.947381],
+        [119.679837, 11.047791],
+        [119.6, 11.1]
+      ]
+    },
+    {
+      "date": "2025-11-05T00:00:00Z",
+      "coordinates": [119.1, 11.4],
+      "wind": 74,
+      "pressure": 980,
+      "basin": "WP",
+      "forecast": false,
+      "rank": 2,
+      "code": "T",
+      "description": "Typhoon",
+      "spline": [
+        [119.6, 11.1],
+        [119.40893, 11.228339],
+        [119.323232, 11.282423],
+        [119.208413, 11.34659],
+        [119.1, 11.4]
+      ]
+    },
+    {
+      "date": "2025-11-05T03:00:00Z",
+      "coordinates": [118.1, 11.8],
+      "wind": 77,
+      "pressure": 976,
+      "basin": "WP",
+      "forecast": false,
+      "rank": 2,
+      "code": "T",
+      "description": "Typhoon",
+      "spline": [
+        [119.1, 11.4],
+        [118.874865, 11.500099],
+        [118.640206, 11.59704],
+        [118.368666, 11.702418],
+        [118.1, 11.8]
+      ]
+    },
+    {
+      "date": "2025-11-05T06:00:00Z",
+      "coordinates": [117.1, 12.1],
+      "wind": 80,
+      "pressure": 972,
+      "basin": "WP",
+      "forecast": false,
+      "rank": 2,
+      "code": "T",
+      "description": "Typhoon",
+      "spline": [
+        [118.1, 11.8],
+        [117.782101, 11.902426],
+        [117.1, 12.1]
+      ]
+    },
+    {
+      "date": "2025-11-05T09:00:00Z",
+      "coordinates": [116.5, 12.3],
+      "wind": 85,
+      "pressure": 971,
+      "basin": "WP",
+      "forecast": false,
+      "rank": 2,
+      "code": "T",
+      "description": "Typhoon",
+      "spline": [
+        [117.1, 12.1],
+        [116.866929, 12.175098],
+        [116.5, 12.3]
+      ]
+    },
+    {
+      "date": "2025-11-05T12:00:00Z",
+      "coordinates": [115.9, 12.5],
+      "wind": 89,
+      "pressure": 970,
+      "basin": "WP",
+      "forecast": false,
+      "rank": 2,
+      "code": "T",
+      "description": "Typhoon",
+      "spline": [
+        [116.5, 12.3],
+        [116.110874, 12.416746],
+        [116.009597, 12.453297],
+        [115.9, 12.5]
+      ]
+    },
+    {
+      "date": "2025-11-05T15:00:00Z",
+      "coordinates": [115.2, 12.9],
+      "wind": 94,
+      "pressure": 965,
+      "basin": "WP",
+      "forecast": false,
+      "rank": 2,
+      "code": "T",
+      "description": "Typhoon",
+      "spline": [
+        [115.9, 12.5],
+        [115.829526, 12.53508],
+        [115.746556, 12.58205],
+        [115.391437, 12.80292],
+        [115.287929, 12.85865],
+        [115.2, 12.9]
+      ]
+    },
+    {
+      "date": "2025-11-05T18:00:00Z",
+      "coordinates": [114.3, 13.2],
+      "wind": 99,
+      "pressure": 960,
+      "basin": "WP",
+      "forecast": false,
+      "rank": 3,
+      "code": "ST",
+      "description": "Very Strong Typhoon",
+      "spline": [
+        [115.2, 12.9],
+        [114.921637, 13.019886],
+        [114.80745, 13.064739],
+        [114.699087, 13.103126],
+        [114.586857, 13.137764],
+        [114.499547, 13.160783],
+        [114.388507, 13.184908],
+        [114.3, 13.2]
+      ]
+    },
+    {
+      "date": "2025-11-05T21:00:00Z",
+      "coordinates": [113.2, 13.2],
+      "wind": 107,
+      "pressure": 954,
+      "basin": "WP",
+      "forecast": false,
+      "rank": 3,
+      "code": "ST",
+      "description": "Very Strong Typhoon",
+      "spline": [
+        [114.3, 13.2],
+        [114.142337, 13.217009],
+        [113.944975, 13.223333],
+        [113.774189, 13.220076],
+        [113.351257, 13.202377],
+        [113.2, 13.2]
+      ]
+    },
+    {
+      "date": "2025-11-06T00:00:00Z",
+      "coordinates": [112.1, 13.2],
+      "wind": 115,
+      "pressure": 948,
+      "basin": "WP",
+      "forecast": false,
+      "rank": 3,
+      "code": "ST",
+      "description": "Very Strong Typhoon"
+    },
+    {
+      "date": "2025-11-06T03:00:00Z",
+      "coordinates": [111.3, 13.2],
+      "wind": 112,
+      "pressure": 950,
+      "basin": "WP",
+      "forecast": false,
+      "rank": 3,
+      "code": "ST",
+      "description": "Very Strong Typhoon",
+      "spline": [
+        [112.1, 13.2],
+        [111.54975, 13.192222],
+        [111.419022, 13.194176],
+        [111.3, 13.2]
+      ]
+    },
+    {
+      "date": "2025-11-06T06:00:00Z",
+      "coordinates": [110.6, 13.3],
+      "wind": 109,
+      "pressure": 951,
+      "basin": "WP",
+      "forecast": false,
+      "rank": 3,
+      "code": "ST",
+      "description": "Very Strong Typhoon",
+      "spline": [
+        [111.3, 13.2],
+        [111.18787, 13.209581],
+        [111.057418, 13.225766],
+        [110.6, 13.3]
+      ]
+    },
+    {
+      "date": "2025-11-06T09:00:00Z",
+      "coordinates": [109.9, 13.4],
+      "wind": 104,
+      "pressure": 956,
+      "basin": "WP",
+      "forecast": false,
+      "rank": 3,
+      "code": "ST",
+      "description": "Very Strong Typhoon",
+      "spline": [
+        [110.6, 13.3],
+        [110.131438, 13.360285],
+        [109.9, 13.4]
+      ]
+    },
+    {
+      "date": "2025-11-06T12:00:00Z",
+      "coordinates": [109.1, 13.6],
+      "wind": 99,
+      "pressure": 960,
+      "basin": "WP",
+      "forecast": false,
+      "rank": 3,
+      "code": "ST",
+      "description": "Very Strong Typhoon",
+      "spline": [
+        [109.9, 13.4],
+        [109.618223, 13.452302],
+        [109.47153, 13.484434],
+        [109.300798, 13.532036],
+        [109.1, 13.6]
+      ]
+    },
+    {
+      "date": "2025-11-06T18:00:00Z",
+      "coordinates": [107.7, 14.2],
+      "wind": 70,
+      "pressure": 982,
+      "basin": "WP",
+      "forecast": false,
+      "rank": -2,
+      "code": "B",
+      "description": "Tropical Disturbance",
+      "spline": [
+        [109.1, 13.6],
+        [108.961815, 13.654568],
+        [108.845537, 13.705425],
+        [108.311994, 13.956092],
+        [108.110326, 14.046055],
+        [107.894623, 14.133038],
+        [107.7, 14.2]
+      ]
+    },
+    {
+      "date": "2025-11-07T00:00:00Z",
+      "coordinates": [106.2, 14.5],
+      "wind": 40,
+      "pressure": 1001,
+      "basin": "WP",
+      "forecast": false,
+      "rank": -2,
+      "code": "B",
+      "description": "Tropical Disturbance",
+      "spline": [
+        [107.7, 14.2],
+        [107.486241, 14.258757],
+        [107.269689, 14.306318],
+        [107.035954, 14.348997],
+        [106.487484, 14.438955],
+        [106.329217, 14.469674],
+        [106.2, 14.5]
+      ]
+    },
+    {
+      "date": "2025-11-07T06:00:00Z",
+      "coordinates": [105.4, 14.8],
+      "wind": 30,
+      "pressure": 1003,
+      "basin": "WP",
+      "forecast": false,
+      "rank": -2,
+      "code": "R",
+      "description": "Remnant Low",
+      "spline": [
+        [106.2, 14.5],
+        [105.959232, 14.56612],
+        [105.79171, 14.62111],
+        [105.629822, 14.688241],
+        [105.4, 14.8]
+      ]
+    },
+    {
+      "date": "2025-11-07T12:00:00Z",
+      "coordinates": [104.4, 15.4],
+      "wind": 20,
+      "pressure": 1006,
+      "basin": "WP",
+      "forecast": false,
+      "rank": -2,
+      "code": "R",
+      "description": "Remnant Low",
+      "spline": [
+        [105.4, 14.8],
+        [105.243165, 14.884096],
+        [105.002321, 15.024608],
+        [104.715622, 15.200202],
+        [104.4, 15.4]
+      ]
+    }
+  ],
+  "cone": null,
+  "place": "near _Vietnam_",
+  "placePath": "vietnam"
+}

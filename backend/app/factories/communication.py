@@ -89,8 +89,8 @@ class MeshPacketFactory(BaseFactory):
     class Meta:
         model = MeshPacket
 
-    sender_citizen = factory.SubFactory(CitizenFactory) if fake.boolean(chance_of_getting_true=80) else None
-    receiver_citizen = factory.SubFactory(CitizenFactory) if fake.boolean(chance_of_getting_true=60) else None
+    sender = factory.SubFactory(CitizenFactory) if fake.boolean(chance_of_getting_true=80) else None
+    receiver = factory.SubFactory(CitizenFactory) if fake.boolean(chance_of_getting_true=60) else None
     packet_type = factory.Iterator([
         PacketType.STATUS,
         PacketType.SOS,

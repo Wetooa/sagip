@@ -1,9 +1,9 @@
 """Citizen-related factories."""
 import factory
 import random
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, date
 from app.factories.base import BaseFactory, fake, get_philippine_coordinates, get_philippine_phone
-from app.models.citizen import Citizen, CensusData, VulnerabilityProfile, UserRole, RiskLevel
+from app.models.citizen import Citizen, CensusData, VulnerabilityProfile, FamilyMember, UserRole, RiskLevel
 from app.core.security import get_password_hash
 
 # Cache for password hash to avoid recomputing
@@ -49,7 +49,26 @@ class CensusDataFactory(BaseFactory):
     address = factory.LazyAttribute(lambda obj: fake.street_address())
     barangay = factory.LazyAttribute(lambda obj: fake.city_suffix() + " " + fake.word().title())
     city = factory.LazyAttribute(lambda obj: fake.city())
-    province = factory.LazyAttribute(lambda obj: fake.state())
+    province = factory.LazyAttribute(
+        lambda obj: fake.random_element(elements=[
+            "Metro Manila", "Cebu", "Davao", "Laguna", "Cavite", "Rizal", 
+            "Bulacan", "Pampanga", "Batangas", "Quezon", "Negros Occidental",
+            "Iloilo", "Zamboanga del Sur", "Palawan", "Bohol"
+        ])
+    )
+    government_id = factory.LazyAttribute(
+        lambda obj: fake.random_element(elements=[
+            f"SSS-{random.randint(1000000, 9999999)}",
+            f"TIN-{random.randint(100000000, 999999999)}",
+            f"PHILHEALTH-{random.randint(10000000, 99999999)}",
+            f"PAGIBIG-{random.randint(10000000, 99999999)}",
+        ]) if fake.boolean(chance_of_getting_true=70) else None
+    )
+    birth_date = factory.LazyFunction(
+        lambda: (datetime.utcnow() - timedelta(days=random.randint(18*365, 80*365))).date()
+        if fake.boolean(chance_of_getting_true=80) else None
+    )
+    has_vulnerable_family_member = factory.LazyFunction(lambda: fake.boolean(chance_of_getting_true=30))
     additional_info = factory.LazyAttribute(
         lambda obj: {
             "emergency_contact": get_philippine_phone(),
@@ -97,5 +116,59 @@ class VulnerabilityProfileFactory(BaseFactory):
         }
     )
     last_calculated_at = factory.LazyFunction(datetime.utcnow)
+    created_at = factory.LazyFunction(datetime.utcnow)
+    updated_at = factory.LazyFunction(datetime.utcnow)
+
+
+class FamilyMemberFactory(BaseFactory):
+    """Factory for FamilyMember model."""
+
+    class Meta:
+        model = FamilyMember
+
+    census_data = factory.SubFactory(CensusDataFactory)
+    full_name = factory.LazyAttribute(lambda obj: fake.name())
+    relationship = factory.LazyAttribute(
+        lambda obj: fake.random_element(elements=["spouse", "child", "parent", "sibling", "other"])
+    )
+    
+    @factory.lazy_attribute
+    def age(self):
+        """Generate age based on relationship."""
+        relationship = self.relationship
+        if relationship == "child":
+            return random.randint(0, 18)
+        elif relationship == "parent":
+            return random.randint(50, 90)
+        elif relationship == "spouse":
+            return random.randint(25, 65)
+        elif relationship == "sibling":
+            return random.randint(15, 50)
+        else:
+            return random.randint(0, 80)
+    
+    government_id = factory.LazyAttribute(
+        lambda obj: fake.random_element(elements=[
+            f"SSS-{random.randint(1000000, 9999999)}",
+            f"TIN-{random.randint(100000000, 999999999)}",
+            f"PHILHEALTH-{random.randint(10000000, 99999999)}",
+        ]) if fake.boolean(chance_of_getting_true=50) else None
+    )
+    
+    @factory.lazy_attribute
+    def is_vulnerable(self):
+        """Determine if member is vulnerable (20% chance)."""
+        return fake.boolean(chance_of_getting_true=20)
+    
+    @factory.lazy_attribute
+    def vulnerability_type(self):
+        """Set vulnerability type if member is vulnerable."""
+        if self.is_vulnerable:
+            return fake.random_element(elements=["elderly", "PWD", "bed-ridden", "sickly"])
+        return None
+    
+    medical_conditions = factory.LazyAttribute(
+        lambda obj: fake.text(max_nb_chars=200) if obj.is_vulnerable and fake.boolean(chance_of_getting_true=60) else None
+    )
     created_at = factory.LazyFunction(datetime.utcnow)
     updated_at = factory.LazyFunction(datetime.utcnow)

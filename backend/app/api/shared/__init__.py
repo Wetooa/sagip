@@ -1,7 +1,7 @@
 """Shared API routes."""
 from fastapi import APIRouter
 
-from app.api.shared import chatbot, mesh, location, hazard_mapping, prediction
+from app.api.shared import chatbot, mesh, location, hazard_mapping, prediction, rescue_request, geojson
 
 router = APIRouter()
 
