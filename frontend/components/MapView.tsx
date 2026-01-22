@@ -118,7 +118,7 @@ export function MapView({ category }: MapViewProps) {
   const [selectedSickness, setSelectedSickness] =
     useState<SicknessType>("leptospirosis");
   const [selectedProvince, setSelectedProvince] = useState<string | null>(
-    "Cebu"
+    "Cebu",
   );
 
   // Rescue pin state
@@ -321,40 +321,43 @@ export function MapView({ category }: MapViewProps) {
     }
   };
 
-  const updateRescueSource = useCallback((mapInstance: maplibregl.Map) => {
-    const source = mapInstance.getSource("rescue-pins") as
-      | maplibregl.GeoJSONSource
-      | undefined;
-    if (!source) return;
+  const updateRescueSource = useCallback(
+    (mapInstance: maplibregl.Map) => {
+      const source = mapInstance.getSource("rescue-pins") as
+        | maplibregl.GeoJSONSource
+        | undefined;
+      if (!source) return;
 
-    const filtered = rescuePinsRef.current.filter((pin) => {
-      const matchesUrgency =
-        rescueFilters.urgency === "all" ||
-        pin.urgency === rescueFilters.urgency;
-      const matchesStatus =
-        rescueFilters.status === "all" || pin.status === rescueFilters.status;
-      return matchesUrgency && matchesStatus;
-    });
+      const filtered = rescuePinsRef.current.filter((pin) => {
+        const matchesUrgency =
+          rescueFilters.urgency === "all" ||
+          pin.urgency === rescueFilters.urgency;
+        const matchesStatus =
+          rescueFilters.status === "all" || pin.status === rescueFilters.status;
+        return matchesUrgency && matchesStatus;
+      });
 
-    const features = filtered.map((pin) => ({
-      type: "Feature" as const,
-      geometry: {
-        type: "Point" as const,
-        coordinates: [pin.longitude, pin.latitude],
-      },
-      properties: {
-        id: pin.id,
-        urgency: pin.urgency,
-        status: pin.status,
-        name: pin.name || "Rescue request",
-      },
-    }));
+      const features = filtered.map((pin) => ({
+        type: "Feature" as const,
+        geometry: {
+          type: "Point" as const,
+          coordinates: [pin.longitude, pin.latitude],
+        },
+        properties: {
+          id: pin.id,
+          urgency: pin.urgency,
+          status: pin.status,
+          name: pin.name || "Rescue request",
+        },
+      }));
 
-    source.setData({
-      type: "FeatureCollection",
-      features,
-    });
-  }, [rescueFilters]);
+      source.setData({
+        type: "FeatureCollection",
+        features,
+      });
+    },
+    [rescueFilters],
+  );
 
   // Normalize storm data
   const normalizeStorm = (storm: TyphoonData): TyphoonData | null => {
@@ -835,7 +838,7 @@ export function MapView({ category }: MapViewProps) {
               Elderly Count: ${props.elderly_count || "N/A"}<br/>
               Stories: ${props.stories || "N/A"}<br/>
               Risk Status: ${props.risk_status || "N/A"}
-            </div>`
+            </div>`,
           )
           .addTo(mapInstance);
       });
@@ -855,7 +858,7 @@ export function MapView({ category }: MapViewProps) {
         map.current.setLayoutProperty(
           "evacuation-centers-layer",
           "visibility",
-          "none"
+          "none",
         );
       }
       return;
@@ -867,13 +870,13 @@ export function MapView({ category }: MapViewProps) {
       if (mapInstance.getSource("evacuation-centers-source")) {
         (
           mapInstance.getSource(
-            "evacuation-centers-source"
+            "evacuation-centers-source",
           ) as maplibregl.GeoJSONSource
         ).setData(evacuationCentersData as any);
         mapInstance.setLayoutProperty(
           "evacuation-centers-layer",
           "visibility",
-          "visible"
+          "visible",
         );
         return;
       }
@@ -908,7 +911,7 @@ export function MapView({ category }: MapViewProps) {
               Current: ${props.current_occupancy || "N/A"}<br/>
               Occupancy: ${props.occupancy_percentage || 0}%<br/>
               WiFi: ${props.has_wifi ? "Yes" : "No"}
-            </div>`
+            </div>`,
           )
           .addTo(mapInstance);
       });
@@ -960,12 +963,16 @@ export function MapView({ category }: MapViewProps) {
 
       if (source) {
         source.setData(processedData as any);
-        mapInstance.setLayoutProperty("barangay-layer", "visibility", "visible");
+        mapInstance.setLayoutProperty(
+          "barangay-layer",
+          "visibility",
+          "visible",
+        );
         // Update paint properties
         mapInstance.setPaintProperty(
           "barangay-layer",
           "fill-color",
-          sicknessColor
+          sicknessColor,
         );
         return;
       }
@@ -981,11 +988,7 @@ export function MapView({ category }: MapViewProps) {
         source: "barangay-source",
         paint: {
           "fill-color": ["get", "_computed_color"],
-          "fill-opacity": [
-            "coalesce",
-            ["get", "_computed_opacity"],
-            0.3,
-          ],
+          "fill-opacity": ["coalesce", ["get", "_computed_opacity"], 0.3],
           "fill-outline-color": "#000",
         },
       });
@@ -1006,7 +1009,7 @@ export function MapView({ category }: MapViewProps) {
               <strong>Health Risk</strong><br/>
               ${selectedSickness}: ${sicknessRisk.regression_score || "N/A"}<br/>
               Risk Level: ${sicknessRisk.risk_level || "N/A"}
-            </div>`
+            </div>`,
           )
           .addTo(mapInstance);
       });
