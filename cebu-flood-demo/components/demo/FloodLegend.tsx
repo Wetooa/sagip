@@ -1,13 +1,15 @@
-'use client';
+"use client";
+
+import React from "react";
 
 export default function FloodLegend() {
   const legendItems = [
-    { color: '#e3f2fd', label: '0m - Very Low', depth: '0m' },
-    { color: '#90caf9', label: '0-0.5m - Low', depth: '0-0.5m' },
-    { color: '#42a5f5', label: '0.5-1m - Moderate', depth: '0.5-1m' },
-    { color: '#1e88e5', label: '1-2m - High', depth: '1-2m' },
-    { color: '#1565c0', label: '2-5m - Very High', depth: '2-5m' },
-    { color: '#0d47a1', label: '5m+ - Extreme', depth: '5m+' },
+    { color: "#e3f2fd", label: "0m - Very Low", depth: "0m" },
+    { color: "#90caf9", label: "0-0.5m - Low", depth: "0-0.5m" },
+    { color: "#42a5f5", label: "0.5-1m - Moderate", depth: "0.5-1m" },
+    { color: "#1e88e5", label: "1-2m - High", depth: "1-2m" },
+    { color: "#1565c0", label: "2-5m - Very High", depth: "2-5m" },
+    { color: "#0d47a1", label: "5m+ - Extreme", depth: "5m+" },
   ];
 
   return (
