@@ -27,10 +27,10 @@ export default function Home() {
       {/* Mobile Phone Frame */}
       <div className="w-full max-w-[390px] h-[844px] bg-black rounded-[3rem] shadow-2xl overflow-hidden border-8 border-gray-800 relative">
         {/* Notch */}
-        <div className="absolute top-0 left-1/2 transform -translate-x-1/2 w-40 h-7 bg-black rounded-b-3xl z-50"></div>
+        {/* <div className="absolute top-0 left-1/2 transform -translate-x-1/2 w-40 h-7 bg-black rounded-b-3xl z-50"></div> */}
 
         {/* App Content */}
-        <div className="h-full w-full flex flex-col bg-[#F4E4C1]">
+        <div id="phone" className="h-full w-full flex flex-col bg-[#F4E4C1]">
           <Header />
 
           <div className="flex-1 relative overflow-hidden">
