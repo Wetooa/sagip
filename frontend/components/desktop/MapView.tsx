@@ -2,7 +2,16 @@
 
 import { useEffect, useRef, useState } from "react";
 import maplibregl from "maplibre-gl";
-import type { HazardCategory } from "app/page";
+
+export type HazardCategory =
+  | "flood"
+  | "storm-surge"
+  | "landslide"
+  | "rainfall"
+  | "buildings"
+  | "elevation"
+  | "facilities"
+  | "roads";
 import { TyphoonData } from "@/types/typhoon";
 import { toast } from "sonner";
 import {
@@ -23,8 +32,8 @@ import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Calendar as CalendarIcon, RefreshCw } from "lucide-react";
 import { format } from "date-fns";
-import LocationSearch from "./LocationSearch";
-import { LayerControls } from "./LayerControls";
+// Desktop MapView doesn't include LayerControls or LocationSearch
+// They are handled by the desktop page layout
 import {
   useCensusData,
   useEvacuationCenters,
@@ -35,13 +44,27 @@ import { SICKNESS_COLORS } from "@/types/geojson";
 
 interface MapViewProps {
   category: HazardCategory;
+  // Layer state (controlled from parent)
+  censusEnabled?: boolean;
+  evacuationCentersEnabled?: boolean;
+  barangayEnabled?: boolean;
+  selectedSickness?: SicknessType;
+  // Map ref for LocationSearch
+  onMapReady?: (map: maplibregl.Map | null) => void;
 }
 
 // Cebu City coordinates
 const CEBU_CENTER: [number, number] = [123.8854, 10.3157];
 const DEFAULT_ZOOM = 11;
 
-export function MapView({ category }: MapViewProps) {
+export function MapView({ 
+  category,
+  censusEnabled: externalCensusEnabled,
+  evacuationCentersEnabled: externalEvacuationCentersEnabled,
+  barangayEnabled: externalBarangayEnabled,
+  selectedSickness: externalSelectedSickness,
+  onMapReady,
+}: MapViewProps) {
   const mapContainer = useRef<HTMLDivElement>(null);
   const map = useRef<maplibregl.Map | null>(null);
   const typhoonInteractionsBound = useRef(false);
@@ -59,20 +82,22 @@ export function MapView({ category }: MapViewProps) {
   const [datePickerOpen, setDatePickerOpen] = useState(false);
   const [stormDrawerOpen, setStormDrawerOpen] = useState(false);
 
-  // Layer toggle state
-  const [censusEnabled, setCensusEnabled] = useState(false);
-  const [evacuationCentersEnabled, setEvacuationCentersEnabled] =
-    useState(false);
-  const [barangayEnabled, setBarangayEnabled] = useState(false);
+  // Layer toggle state (use external if provided, otherwise internal)
+  const [internalCensusEnabled, setInternalCensusEnabled] = useState(false);
+  const [internalEvacuationCentersEnabled, setInternalEvacuationCentersEnabled] = useState(false);
+  const [internalBarangayEnabled, setInternalBarangayEnabled] = useState(false);
+  const [internalSelectedSickness, setInternalSelectedSickness] = useState<SicknessType>("leptospirosis");
 
-  // Health risk selection state
-  const [selectedSickness, setSelectedSickness] =
-    useState<SicknessType>("leptospirosis");
+  const censusEnabled = externalCensusEnabled ?? internalCensusEnabled;
+  const evacuationCentersEnabled = externalEvacuationCentersEnabled ?? internalEvacuationCentersEnabled;
+  const barangayEnabled = externalBarangayEnabled ?? internalBarangayEnabled;
+  const selectedSickness = externalSelectedSickness ?? internalSelectedSickness;
   const [selectedProvince, setSelectedProvince] = useState<string | null>(
     "Cebu"
   );
 
   const activePulseFrame = useRef<number | null>(null);
+  const censusHoveredIdRef = useRef<number | null>(null);
 
   // Fetch data using TanStack Query
   const { data: censusData } = useCensusData();
@@ -110,11 +135,16 @@ export function MapView({ category }: MapViewProps) {
       zoom: DEFAULT_ZOOM,
     });
 
-    // Add navigation controls (compact for mobile)
+    // Add navigation controls
     map.current.addControl(
       new maplibregl.NavigationControl({ showCompass: false }),
       "top-right",
     );
+
+    // Notify parent that map is ready
+    if (onMapReady) {
+      onMapReady(map.current);
+    }
 
     // Load initial typhoon data
     loadStormsFor(selectedDate);
@@ -434,15 +464,6 @@ export function MapView({ category }: MapViewProps) {
     const mapInstance = map.current;
 
     if (mapInstance.loaded()) {
-      // Flood visibility
-      if (mapInstance.getLayer("flood-hazard-fill")) {
-        mapInstance.setLayoutProperty(
-          "flood-hazard-fill",
-          "visibility",
-          category === "flood" ? "visible" : "none",
-        );
-      }
-
       // Typhoon visibility
       const showStorms =
         typhoonEnabled &&
@@ -485,27 +506,52 @@ export function MapView({ category }: MapViewProps) {
 
   // Add census layer
   useEffect(() => {
-    if (!map.current || !censusData || !censusEnabled) {
-      if (map.current?.getLayer("census-layer")) {
-        map.current.setLayoutProperty("census-layer", "visibility", "none");
+    const mapInstance = map.current;
+    if (!mapInstance || !censusData) {
+      return;
+    }
+
+    if (!censusEnabled) {
+      if (mapInstance.getLayer("census-layer")) {
+        mapInstance.setLayoutProperty("census-layer", "visibility", "none");
+        const hid = censusHoveredIdRef.current;
+        if (hid !== null) {
+          try {
+            mapInstance.setFeatureState(
+              { source: "census-source", id: hid },
+              { hover: false }
+            );
+          } catch (_) {}
+          censusHoveredIdRef.current = null;
+        }
+        mapInstance.getCanvas().style.cursor = "";
       }
       return;
     }
 
-    const mapInstance = map.current;
+    const censusWithIds = {
+      ...censusData,
+      features: (censusData as { features: Array<{ properties?: Record<string, unknown> }> }).features.map(
+        (f, i) => ({
+          ...f,
+          properties: { ...(f.properties || {}), id: i },
+        })
+      ),
+    };
 
     const addCensusLayer = () => {
       if (mapInstance.getSource("census-source")) {
         (
           mapInstance.getSource("census-source") as maplibregl.GeoJSONSource
-        ).setData(censusData as any);
+        ).setData(censusWithIds as any);
         mapInstance.setLayoutProperty("census-layer", "visibility", "visible");
         return;
       }
 
       mapInstance.addSource("census-source", {
         type: "geojson",
-        data: censusData as any,
+        data: censusWithIds as any,
+        promoteId: "id",
       });
 
       mapInstance.addLayer({
@@ -515,39 +561,108 @@ export function MapView({ category }: MapViewProps) {
         paint: {
           "fill-color": [
             "case",
-            ["get", "risk_status"],
+            ["boolean", ["feature-state", "hover"], false],
             [
               "match",
               ["get", "risk_status"],
               1,
-              "#ef4444",
+              "#fb923c",
               2,
-              "#f97316",
+              "#fdba74",
               3,
-              "#eab308",
-              "#22c55e",
+              "#7dd3fc",
+              0,
+              "#93c5fd",
+              "#cbd5e1",
             ],
-            "#94a3b8",
+            [
+              "match",
+              ["get", "risk_status"],
+              1,
+              "#f97316",
+              2,
+              "#fb923c",
+              3,
+              "#38bdf8",
+              0,
+              "#3b82f6",
+              "#94a3b8",
+            ],
           ],
-          "fill-opacity": 0.5,
+          "fill-opacity": [
+            "case",
+            ["boolean", ["feature-state", "hover"], false],
+            0.85,
+            0.5,
+          ],
           "fill-outline-color": "#64748b",
         },
       });
 
+      mapInstance.on("mouseenter", "census-layer", (e) => {
+        mapInstance.getCanvas().style.cursor = "pointer";
+        if (!e.features || e.features.length === 0) return;
+        const id = e.features[0].id as number;
+        if (id == null) return;
+        censusHoveredIdRef.current = id;
+        mapInstance.setFeatureState(
+          { source: "census-source", id },
+          { hover: true }
+        );
+      });
+
+      mapInstance.on("mouseleave", "census-layer", () => {
+        mapInstance.getCanvas().style.cursor = "";
+        const hid = censusHoveredIdRef.current;
+        if (hid !== null) {
+          try {
+            mapInstance.setFeatureState(
+              { source: "census-source", id: hid },
+              { hover: false }
+            );
+          } catch (_) {}
+          censusHoveredIdRef.current = null;
+        }
+      });
+
       mapInstance.on("click", "census-layer", (e) => {
         if (!e.features || e.features.length === 0) return;
-        const props = e.features[0].properties || {};
-        const popup = new maplibregl.Popup()
+        const props = e.features[0].properties as Record<string, unknown> || {};
+        const riskStatus = props.risk_status as number | undefined;
+        const riskLabel =
+          riskStatus === 1
+            ? "High"
+            : riskStatus === 0
+              ? "Low"
+              : riskStatus != null
+                ? String(riskStatus)
+                : "—";
+        const riskClass =
+          riskStatus === 1 ? "risk-high" : riskStatus === 0 ? "risk-low" : "risk-neutral";
+        const pop = (v: unknown) =>
+          typeof v === "number" ? v.toFixed(1) : v != null ? String(v) : "—";
+        const vuln =
+          props.vulnerability_score != null
+            ? (props.vulnerability_score as number).toFixed(2)
+            : "—";
+        const html = `
+          <div class="popup-census">
+            <div class="popup-census__title">Census – Risk Overview</div>
+            <div class="popup-census__risk">
+              <span class="popup-census__badge popup-census__badge--${riskClass}">${riskLabel}</span>
+              ${vuln !== "—" ? `<span class="popup-census__vuln">Vulnerability: ${vuln}</span>` : ""}
+            </div>
+            <dl class="popup-census__dl">
+              <dt>Total population</dt><dd>${pop(props.total_pop)}</dd>
+              <dt>Elderly count</dt><dd>${pop(props.elderly_count)}</dd>
+              <dt>Child count</dt><dd>${pop(props.child_count)}</dd>
+              <dt>Stories</dt><dd>${pop(props.stories)}</dd>
+            </dl>
+          </div>
+        `;
+        new maplibregl.Popup({ className: "popup-census-wrapper" })
           .setLngLat(e.lngLat)
-          .setHTML(
-            `<div>
-              <strong>Census Data</strong><br/>
-              Total Population: ${props.total_pop || "N/A"}<br/>
-              Elderly Count: ${props.elderly_count || "N/A"}<br/>
-              Stories: ${props.stories || "N/A"}<br/>
-              Risk Status: ${props.risk_status || "N/A"}
-            </div>`
-          )
+          .setHTML(html)
           .addTo(mapInstance);
       });
     };
@@ -733,21 +848,6 @@ export function MapView({ category }: MapViewProps) {
   return (
     <div className="relative w-full h-full">
       <div ref={mapContainer} className="w-full h-full" />
-
-      {/* Layer Controls */}
-      <LayerControls
-        censusEnabled={censusEnabled}
-        evacuationCentersEnabled={evacuationCentersEnabled}
-        barangayEnabled={barangayEnabled}
-        onCensusToggle={setCensusEnabled}
-        onEvacuationCentersToggle={setEvacuationCentersEnabled}
-        onBarangayToggle={setBarangayEnabled}
-        selectedSickness={selectedSickness}
-        onSicknessChange={setSelectedSickness}
-      />
-
-      {/* Location Search */}
-      <LocationSearch map={map.current} />
 
       {/* Date Picker Popover - Top Right */}
       <div className="absolute top-4 right-16 z-10 flex gap-2">

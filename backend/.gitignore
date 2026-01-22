@@ -1,5 +1,5 @@
 # Data directory - all data files should be ignored
-data
+data/*
 
 # GeoJSON files
 *.geojson

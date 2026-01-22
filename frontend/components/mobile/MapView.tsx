@@ -2,7 +2,11 @@
 
 import { useEffect, useRef, useState } from "react";
 import maplibregl from "maplibre-gl";
-import type { HazardCategory } from "app/page";
+
+export type HazardCategory =
+  | "flood"
+  | "storm-surge"
+  | "landslide";
 import { TyphoonData } from "@/types/typhoon";
 import { toast } from "sonner";
 import {
@@ -71,6 +75,9 @@ export function MapView({ category }: MapViewProps) {
   const [selectedProvince, setSelectedProvince] = useState<string | null>(
     "Cebu"
   );
+
+  // Layer controls drawer state
+  const [layerDrawerOpen, setLayerDrawerOpen] = useState(false);
 
   const activePulseFrame = useRef<number | null>(null);
 
@@ -434,15 +441,6 @@ export function MapView({ category }: MapViewProps) {
     const mapInstance = map.current;
 
     if (mapInstance.loaded()) {
-      // Flood visibility
-      if (mapInstance.getLayer("flood-hazard-fill")) {
-        mapInstance.setLayoutProperty(
-          "flood-hazard-fill",
-          "visibility",
-          category === "flood" ? "visible" : "none",
-        );
-      }
-
       // Typhoon visibility
       const showStorms =
         typhoonEnabled &&
@@ -744,10 +742,12 @@ export function MapView({ category }: MapViewProps) {
         onBarangayToggle={setBarangayEnabled}
         selectedSickness={selectedSickness}
         onSicknessChange={setSelectedSickness}
+        open={layerDrawerOpen}
+        onOpenChange={setLayerDrawerOpen}
       />
 
       {/* Location Search */}
-      <LocationSearch map={map.current} />
+      <LocationSearch map={map.current} drawerOpen={layerDrawerOpen} />
 
       {/* Date Picker Popover - Top Right */}
       <div className="absolute top-4 right-16 z-10 flex gap-2">
