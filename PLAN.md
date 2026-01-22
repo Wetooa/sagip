@@ -405,40 +405,37 @@ project-disaster/
 │   │   ├── __init__.py
 │   │   ├── main.py              # FastAPI app initialization
 │   │   │
-│   │   ├── api/                 # API route handlers
+│   │   ├── api/                 # API route handlers (NO versioning)
 │   │   │   ├── __init__.py
-│   │   │   ├── v1/              # API version 1
+│   │   │   ├── citizen/          # Citizen endpoints
 │   │   │   │   ├── __init__.py
-│   │   │   │   │
-│   │   │   │   ├── citizen/     # Citizen endpoints
-│   │   │   │   │   ├── __init__.py
-│   │   │   │   │   ├── register.py
-│   │   │   │   │   ├── census.py
-│   │   │   │   │   ├── assets.py
-│   │   │   │   │   ├── lora.py
-│   │   │   │   │   ├── evacuation.py
-│   │   │   │   │   ├── needs.py
-│   │   │   │   │   └── health.py
-│   │   │   │   │
-│   │   │   │   ├── command/     # Command Center endpoints
-│   │   │   │   │   ├── __init__.py
-│   │   │   │   │   ├── incidents.py
-│   │   │   │   │   ├── monitoring.py
-│   │   │   │   │   ├── roll_call.py
-│   │   │   │   │   ├── rescue.py
-│   │   │   │   │   ├── needs.py
-│   │   │   │   │   ├── health.py
-│   │   │   │   │   └── volunteers.py
-│   │   │   │   │
-│   │   │   │   ├── shared/      # Shared endpoints
-│   │   │   │   │   ├── __init__.py
-│   │   │   │   │   ├── chatbot.py
-│   │   │   │   │   ├── mesh.py
-│   │   │   │   │   └── location.py
-│   │   │   │   │
-│   │   │   │   └── debug/       # Debug endpoints
-│   │   │   │       ├── __init__.py
-│   │   │   │       └── debug.py
+│   │   │   │   ├── register.py
+│   │   │   │   ├── census.py
+│   │   │   │   ├── assets.py
+│   │   │   │   ├── lora.py
+│   │   │   │   ├── evacuation.py
+│   │   │   │   ├── needs.py
+│   │   │   │   └── health.py
+│   │   │   │
+│   │   │   ├── command/         # Command Center endpoints
+│   │   │   │   ├── __init__.py
+│   │   │   │   ├── incidents.py
+│   │   │   │   ├── monitoring.py
+│   │   │   │   ├── roll_call.py
+│   │   │   │   ├── rescue.py
+│   │   │   │   ├── needs.py
+│   │   │   │   ├── health.py
+│   │   │   │   └── volunteers.py
+│   │   │   │
+│   │   │   ├── shared/          # Shared endpoints
+│   │   │   │   ├── __init__.py
+│   │   │   │   ├── chatbot.py
+│   │   │   │   ├── mesh.py
+│   │   │   │   └── location.py
+│   │   │   │
+│   │   │   └── debug/           # Debug endpoints
+│   │   │       ├── __init__.py
+│   │   │       └── debug.py
 │   │   │   │
 │   │   ├── core/                # Core application logic
 │   │   │   ├── __init__.py
@@ -446,13 +443,16 @@ project-disaster/
 │   │   │   ├── security.py      # Authentication & authorization
 │   │   │   └── database.py      # Database connection (Supabase)
 │   │   │
-│   │   ├── models/              # Database models (SQLAlchemy/Pydantic)
+│   │   ├── models/              # Database models (SQLAlchemy ORM)
 │   │   │   ├── __init__.py
 │   │   │   ├── citizen.py       # Citizen-related models
-│   │   │   ├── command.py       # Command Center models
+│   │   │   ├── devices.py       # Device models (devices, lora_devices)
 │   │   │   ├── monitoring.py    # Monitoring data models
 │   │   │   ├── location.py      # Location tracking models
-│   │   │   └── shared.py        # Shared models
+│   │   │   ├── emergency.py     # Emergency response models
+│   │   │   ├── post_disaster.py # Post-disaster models
+│   │   │   ├── communication.py # Communication models
+│   │   │   └── nice_to_have.py  # Nice-to-have models
 │   │   │
 │   │   ├── services/            # Business logic services
 │   │   │   ├── __init__.py
@@ -744,49 +744,100 @@ project-disaster/
 ### Base URL Structure
 
 ```
-/api/v1/
+/api/
 ```
+
+**Note:** API versioning has been removed. All endpoints use `/api/` directly.
 
 ### Endpoint Groups
 
 **Citizen Endpoints:**
 
-- `POST /api/v1/citizen/register` - User registration
-- `POST /api/v1/citizen/census` - Submit digital census
-- `GET /api/v1/citizen/profile` - Get citizen profile
-- `POST /api/v1/citizen/lora/register` - Register LoRa device
-- `GET /api/v1/citizen/evacuation/route` - Get evacuation route
-- `POST /api/v1/citizen/needs/ticket` - Create needs ticket
-- `POST /api/v1/citizen/health/report` - Report health symptoms
-- `GET /api/v1/citizen/assets` - Get assets (Nice-to-Have)
-- `POST /api/v1/citizen/assets` - Register assets (Nice-to-Have)
+- `POST /api/citizen/register` - User registration
+- `GET /api/citizen/register/profile` - Get citizen profile
+- `POST /api/citizen/census` - Submit digital census
+- `POST /api/citizen/lora/register` - Register LoRa device
+- `GET /api/citizen/evacuation/route` - Get evacuation route (AI placeholder)
+- `POST /api/citizen/needs/ticket` - Create needs ticket
+- `POST /api/citizen/health/report` - Report health symptoms
+- `GET /api/citizen/assets` - Get assets (Nice-to-Have)
+- `POST /api/citizen/assets` - Register assets (Nice-to-Have)
 
 **Command Center Endpoints:**
 
-- `GET /api/v1/command/dashboard` - Dashboard data
-- `POST /api/v1/command/incidents` - Create/activate incident
-- `GET /api/v1/command/monitoring/water-level` - Water level data
-- `GET /api/v1/command/monitoring/hazard-map` - Hazard mapping data
-- `POST /api/v1/command/roll-call/trigger` - Trigger roll call
-- `GET /api/v1/command/roll-call/responses` - Get roll call responses
-- `GET /api/v1/command/sos/signals` - Get SOS signals
-- `POST /api/v1/command/rescue/dispatch` - Dispatch rescue team
-- `GET /api/v1/command/needs/tickets` - Get needs tickets
-- `GET /api/v1/command/health/clusters` - Get health clusters
-- `POST /api/v1/command/health/dispatch` - Dispatch medical team
+- `GET /api/command/incidents/dashboard` - Dashboard data
+- `POST /api/command/incidents` - Create/activate incident
+- `GET /api/command/incidents` - List all incidents
+- `GET /api/command/monitoring/water-level` - Water level data
+- `GET /api/command/monitoring/hazard-map` - Hazard mapping data (external API)
+- `POST /api/command/roll-call/trigger` - Trigger roll call
+- `GET /api/command/roll-call/responses` - Get roll call responses
+- `GET /api/command/rescue/sos/signals` - Get SOS signals
+- `POST /api/command/rescue/dispatch` - Dispatch rescue team
+- `GET /api/command/needs/tickets` - Get needs tickets
+- `GET /api/command/health/clusters` - Get health clusters (AI placeholder)
+- `POST /api/command/health/dispatch` - Dispatch medical team
+- `GET /api/command/volunteers` - Get volunteers (Nice-to-Have)
 
 **Shared Endpoints:**
 
-- `POST /api/v1/chatbot/message` - Chatbot interaction
-- `POST /api/v1/mesh/packet` - Mesh network packet transmission
-- `POST /api/v1/location/predict` - Location prediction
-- `GET /api/v1/location/history` - Location history
+- `POST /api/shared/chatbot/message` - Chatbot interaction (AI placeholder)
+- `POST /api/shared/mesh/packet` - Mesh network packet transmission
+- `POST /api/shared/location/history` - Create location history
+- `GET /api/shared/location/history` - Get location history
+- `POST /api/shared/location/predict` - Location prediction (AI placeholder)
 
 **Debug Endpoints:**
 
-- `GET /api/v1/debug/status` - System status
-- `GET /api/v1/debug/data` - Debug data dump
-- `POST /api/v1/debug/test` - Test endpoint
+- `GET /api/debug/status` - System status
+- `GET /api/debug/data` - Debug data dump
+- `POST /api/debug/test` - Test endpoint
+
+---
+
+## Backend Implementation Status
+
+### Completed
+
+1. **Project Structure**: All directories and files created according to plan
+2. **Database Configuration**: Supabase PostgreSQL connection configured with SQLAlchemy
+3. **SQLAlchemy Models**: All database models created:
+   - Citizen models (Citizen, CensusData, VulnerabilityProfile)
+   - Device models (Device, LoRaDevice)
+   - Monitoring models (WaterLevelReading)
+   - Location models (LocationHistory, PredictedLocation)
+   - Emergency models (Incident, SOSSignal, RollCall, RollCallResponse, RescueDispatch)
+   - Post-disaster models (NeedsTicket, HealthReport, HealthCluster, MedicalDispatch)
+   - Communication models (ChatbotConversation, Notification, MeshPacket)
+   - Nice-to-have models (Asset, Volunteer, DonationFund, ExternalHelpRequest, CrowdsourcedHazard)
+4. **Pydantic Schemas**: Request/response schemas created for all endpoints
+5. **FastAPI Application**: Main app initialized with CORS, routers, and database session dependency
+6. **API Endpoints**: All placeholder endpoints created:
+   - AI/external library endpoints use `pass` as placeholders
+   - All other endpoints are basic CRUD placeholders
+7. **Alembic**: Database migration system configured
+
+### Pending Implementation
+
+1. **Business Logic**: All endpoint implementations need business logic
+2. **Authentication**: JWT authentication needs to be fully implemented
+3. **AI Integrations**: Placeholder endpoints need AI model integrations:
+   - Chatbot service
+   - Location prediction
+   - Evacuation routing
+   - Health cluster detection
+4. **External API Integration**: Hazard map endpoint needs external API integration
+5. **Database Migrations**: Initial migration needs to be created and run
+6. **Testing**: Unit and integration tests need to be written
+
+### Key Implementation Notes
+
+- **No API Versioning**: All endpoints use `/api/` directly (no `/api/v1/`)
+- **Device-Based Location**: Location is bound to devices, not directly to citizens
+- **Standalone LoRa Devices**: LoRa devices can exist independently or be bound to accounts
+- **No Hazard Maps Table**: Hazard maps are fetched from external APIs, not stored
+- **No Remote Sensing Table**: Remote sensing is a concept for location prediction, not stored data
+- **Derived Last Known Locations**: Last known locations are derived from location_history, no separate table
 
 ---
 
