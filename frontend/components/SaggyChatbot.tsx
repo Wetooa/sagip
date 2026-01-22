@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import { Bot, Send } from "lucide-react";
+import { Bot, Send, Loader2 } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -16,6 +16,26 @@ interface Message {
   text: string;
   sender: "user" | "bot";
   timestamp: Date;
+  actions?: string[];
+  followUpQuestion?: string;
+}
+
+interface ChatResponse {
+  type: "text" | "tool" | "error";
+  message?: string;
+  actions?: Array<{
+    text: string;
+    tool_call?: {
+      name?: string;
+      arguments?: Record<string, any>;
+    };
+  }>;
+  follow_up_question?: string;
+  data?: Record<string, any>;
+  meta?: {
+    confidence?: number;
+    source?: string[];
+  };
 }
 
 export function SaggyChatbot() {
@@ -29,7 +49,11 @@ export function SaggyChatbot() {
     },
   ]);
   const [inputValue, setInputValue] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  
+  // API base URL - adjust if needed
+  const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -37,10 +61,10 @@ export function SaggyChatbot() {
 
   useEffect(() => {
     scrollToBottom();
-  }, [messages]);
+  }, [messages, isLoading]);
 
-  const handleSend = () => {
-    if (!inputValue.trim()) return;
+  const handleSend = async () => {
+    if (!inputValue.trim() || isLoading) return;
 
     const userMessage: Message = {
       id: Date.now().toString(),
@@ -50,18 +74,59 @@ export function SaggyChatbot() {
     };
 
     setMessages((prev) => [...prev, userMessage]);
+    const currentInput = inputValue;
     setInputValue("");
+    setIsLoading(true);
 
-    // Simple echo response for now (no API)
-    setTimeout(() => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/chat`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          message: currentInput,
+          user_context: {}, // TODO: Add user context from auth/session
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const data: ChatResponse = await response.json();
+
+      // Extract message, actions, and follow-up question separately
+      const messageText = data.message || "";
+      const actions = data.actions?.map((a) => a.text).filter(Boolean) || [];
+      const followUpQuestion = data.follow_up_question;
+
+      // If no content at all, show a default message
+      const displayText = messageText || 
+        (actions.length > 0 ? "" : "I'm processing your request. Please wait a moment.");
+
       const botMessage: Message = {
         id: (Date.now() + 1).toString(),
-        text: `I received your message: "${inputValue}". This is a placeholder response. The chatbot API will be integrated soon!`,
+        text: displayText,
+        sender: "bot",
+        timestamp: new Date(),
+        actions: actions.length > 0 ? actions : undefined,
+        followUpQuestion: followUpQuestion || undefined,
+      };
+
+      setMessages((prev) => [...prev, botMessage]);
+    } catch (error) {
+      console.error("Error calling chatbot API:", error);
+      const errorMessage: Message = {
+        id: (Date.now() + 1).toString(),
+        text: "Sorry, I encountered an error. Please try again later.",
         sender: "bot",
         timestamp: new Date(),
       };
-      setMessages((prev) => [...prev, botMessage]);
-    }, 500);
+      setMessages((prev) => [...prev, errorMessage]);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const handleKeyPress = (e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -109,9 +174,40 @@ export function SaggyChatbot() {
                       : "bg-gray-200 text-gray-900"
                   }`}
                 >
-                  <p className="text-sm whitespace-pre-wrap">{message.text}</p>
+                  {/* Main message text */}
+                  {message.text && (
+                    <p className="text-sm whitespace-pre-wrap">{message.text}</p>
+                  )}
+                  
+                  {/* Actions as separate items */}
+                  {message.actions && message.actions.length > 0 && (
+                    <div className="mt-2 space-y-1">
+                      {message.actions.map((action, idx) => (
+                        <div
+                          key={idx}
+                          className="text-sm bg-white/50 dark:bg-gray-800/50 rounded px-2 py-1 mt-1"
+                        >
+                          <span className="text-xs text-gray-600 dark:text-gray-400">→ </span>
+                          {action}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  
+                  {/* Follow-up question */}
+                  {message.followUpQuestion && (
+                    <div className="mt-2 pt-2 border-t border-gray-300 dark:border-gray-600">
+                      <p className="text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">
+                        💡 Follow-up:
+                      </p>
+                      <p className="text-sm italic text-gray-600 dark:text-gray-400">
+                        {message.followUpQuestion}
+                      </p>
+                    </div>
+                  )}
+                  
                   <p
-                    className={`text-xs mt-1 ${
+                    className={`text-xs mt-2 ${
                       message.sender === "user"
                         ? "text-white/70"
                         : "text-gray-600"
@@ -125,6 +221,16 @@ export function SaggyChatbot() {
                 </div>
               </div>
             ))}
+            {isLoading && (
+              <div className="flex justify-start">
+                <div className="bg-gray-200 text-gray-900 rounded-lg px-4 py-2 max-w-[80%]">
+                  <div className="flex items-center gap-2">
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    <p className="text-sm">Saggy is thinking...</p>
+                  </div>
+                </div>
+              </div>
+            )}
             <div ref={messagesEndRef} />
           </div>
 
@@ -137,14 +243,19 @@ export function SaggyChatbot() {
                 onKeyPress={handleKeyPress}
                 placeholder="Type your message..."
                 className="flex-1"
+                disabled={isLoading}
               />
               <Button
                 onClick={handleSend}
-                disabled={!inputValue.trim()}
+                disabled={!inputValue.trim() || isLoading}
                 className="bg-[#6B1515] hover:bg-[#6B1515]/90"
                 size="icon"
               >
-                <Send className="h-4 w-4" />
+                {isLoading ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Send className="h-4 w-4" />
+                )}
               </Button>
             </div>
           </div>
