@@ -13,3 +13,4 @@ router.include_router(hazard_mapping.router, prefix="/hazard-mapping", tags=["sh
 router.include_router(prediction.router, prefix="/prediction", tags=["shared-prediction"])
 router.include_router(routing.router, prefix="/routing", tags=["shared-routing"])
 router.include_router(geojson.router, prefix="/geojson", tags=["shared-geojson"])
+router.include_router(rescue_request.router, prefix="/rescue", tags=["shared-rescue"])

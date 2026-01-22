@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import maplibregl from "maplibre-gl";
 import type { HazardCategory } from "app/page";
 import { TyphoonData } from "@/types/typhoon";
@@ -21,7 +21,21 @@ import { Calendar } from "@/components/ui/calendar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Calendar as CalendarIcon, RefreshCw } from "lucide-react";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  Calendar as CalendarIcon,
+  Filter,
+  Loader2,
+  MapPin,
+  RefreshCw,
+  X,
+} from "lucide-react";
 import { format } from "date-fns";
 import LocationSearch from "./LocationSearch";
 import { LayerControls } from "./LayerControls";
@@ -32,9 +46,44 @@ import {
 } from "@/lib/api/geojson";
 import type { SicknessType } from "@/types/geojson";
 import { SICKNESS_COLORS } from "@/types/geojson";
+import RescuePinModal from "./RescuePinModal";
 
 interface MapViewProps {
   category: HazardCategory;
+}
+
+type RescueUrgency = "normal" | "high" | "critical";
+type RescueStatus = "open" | "in_progress" | "resolved" | "cancelled";
+
+interface RescueNeeds {
+  water?: boolean;
+  food?: boolean;
+  medical?: boolean;
+  shelter?: boolean;
+  evacuation?: boolean;
+  other?: string | null;
+}
+
+interface RescuePin {
+  id: string;
+  citizenId?: string | null;
+  name?: string | null;
+  contact?: string | null;
+  householdSize?: number | null;
+  status: RescueStatus;
+  urgency: RescueUrgency;
+  latitude: number;
+  longitude: number;
+  needs: RescueNeeds;
+  note?: string | null;
+  photoUrl?: string | null;
+  createdAt: string;
+  updatedAt?: string | null;
+}
+
+interface RescueFilters {
+  urgency: "all" | RescueUrgency;
+  status: "all" | RescueStatus;
 }
 
 // Cebu City coordinates
@@ -72,12 +121,48 @@ export function MapView({ category }: MapViewProps) {
     "Cebu"
   );
 
+  // Rescue pin state
+  const [rescuePins, setRescuePins] = useState<RescuePin[]>([]);
+  const [rescueLoading, setRescueLoading] = useState(false);
+  const [pinMode, setPinMode] = useState(false);
+  const [draftCoords, setDraftCoords] = useState<{
+    latitude: number;
+    longitude: number;
+  } | null>(null);
+  const [selectedRescue, setSelectedRescue] = useState<RescuePin | null>(null);
+  const [rescueFilters, setRescueFilters] = useState<RescueFilters>({
+    urgency: "all",
+    status: "open",
+  });
+  const [rescueError, setRescueError] = useState<string | null>(null);
+  const [rescueModalOpen, setRescueModalOpen] = useState(false);
+  const rescuePinsRef = useRef<RescuePin[]>([]);
+  const draftMarker = useRef<maplibregl.Marker | null>(null);
+  const [updatingUrgencyId, setUpdatingUrgencyId] = useState<string | null>(
+    null,
+  );
+
   const activePulseFrame = useRef<number | null>(null);
 
   // Fetch data using TanStack Query
   const { data: censusData } = useCensusData();
   const { data: evacuationCentersData } = useEvacuationCenters(true);
   const { data: barangayData } = useBarangaysByProvince(selectedProvince);
+
+  // Memoize click handler to avoid recreating on every render
+  const handleRescueClickCallback = useCallback(
+    (e: maplibregl.MapLayerMouseEvent) => {
+      const feature = e.features?.[0];
+      const id = feature?.properties?.id as string | undefined;
+      if (!id) return;
+      const pin = rescuePinsRef.current.find((p) => p.id === id) || null;
+      if (pin) {
+        setSelectedRescue(pin);
+        setRescueModalOpen(true);
+      }
+    },
+    [],
+  );
 
   // Initialize map
   useEffect(() => {
@@ -126,6 +211,10 @@ export function MapView({ category }: MapViewProps) {
       map.current?.remove();
       map.current = null;
     };
+  }, []);
+
+  useEffect(() => {
+    loadRescuePins();
   }, []);
 
   const loadStormsFor = async (date: Date) => {
@@ -183,6 +272,90 @@ export function MapView({ category }: MapViewProps) {
     }
   };
 
+  useEffect(() => {
+    rescuePinsRef.current = rescuePins;
+  }, [rescuePins]);
+
+  const toRescuePin = (payload: any): RescuePin => ({
+    id: payload.id,
+    citizenId: payload.citizenId ?? payload.citizen_id ?? null,
+    name: payload.name ?? null,
+    contact: payload.contact ?? null,
+    householdSize: payload.householdSize ?? payload.household_size ?? null,
+    status: (payload.status || "open") as RescueStatus,
+    urgency: (payload.urgency || "normal") as RescueUrgency,
+    latitude: payload.latitude,
+    longitude: payload.longitude,
+    needs: {
+      water: Boolean(payload.needs?.water),
+      food: Boolean(payload.needs?.food),
+      medical: Boolean(payload.needs?.medical),
+      shelter: Boolean(payload.needs?.shelter),
+      evacuation: Boolean(payload.needs?.evacuation),
+      other: payload.needs?.other ?? null,
+    },
+    note: payload.note ?? null,
+    photoUrl: payload.photoUrl ?? payload.photo_url ?? null,
+    createdAt: payload.createdAt ?? payload.created_at,
+    updatedAt: payload.updatedAt ?? payload.updated_at,
+  });
+
+  const loadRescuePins = async () => {
+    setRescueLoading(true);
+    setRescueError(null);
+    try {
+      const response = await fetch("/api/rescue-requests?status=all", {
+        cache: "no-store",
+      });
+      if (!response.ok) {
+        throw new Error(`Failed to load rescues (${response.status})`);
+      }
+      const data = (await response.json()) as any[];
+      setRescuePins(data.map(toRescuePin));
+    } catch (error: unknown) {
+      console.error("Failed to load rescue pins", error);
+      setRescueError("Unable to load rescue pins");
+      toast.error("Unable to load rescue pins");
+    } finally {
+      setRescueLoading(false);
+    }
+  };
+
+  const updateRescueSource = (mapInstance: maplibregl.Map) => {
+    const source = mapInstance.getSource("rescue-pins") as
+      | maplibregl.GeoJSONSource
+      | undefined;
+    if (!source) return;
+
+    const filtered = rescuePinsRef.current.filter((pin) => {
+      const matchesUrgency =
+        rescueFilters.urgency === "all" ||
+        pin.urgency === rescueFilters.urgency;
+      const matchesStatus =
+        rescueFilters.status === "all" || pin.status === rescueFilters.status;
+      return matchesUrgency && matchesStatus;
+    });
+
+    const features = filtered.map((pin) => ({
+      type: "Feature" as const,
+      geometry: {
+        type: "Point" as const,
+        coordinates: [pin.longitude, pin.latitude],
+      },
+      properties: {
+        id: pin.id,
+        urgency: pin.urgency,
+        status: pin.status,
+        name: pin.name || "Rescue request",
+      },
+    }));
+
+    source.setData({
+      type: "FeatureCollection",
+      features,
+    });
+  };
+
   // Normalize storm data
   const normalizeStorm = (storm: TyphoonData): TyphoonData | null => {
     if (!storm?.track || !Array.isArray(storm.track)) return null;
@@ -206,6 +379,206 @@ export function MapView({ category }: MapViewProps) {
 
     return { ...storm, track: validTrack };
   };
+
+  useEffect(() => {
+    rescuePinsRef.current = rescuePins;
+  }, [rescuePins]);
+
+  const toRescuePin = (payload: any): RescuePin => ({
+    id: payload.id,
+    citizenId: payload.citizenId ?? payload.citizen_id ?? null,
+    name: payload.name ?? null,
+    contact: payload.contact ?? null,
+    householdSize: payload.householdSize ?? payload.household_size ?? null,
+    status: (payload.status || "open") as RescueStatus,
+    urgency: (payload.urgency || "normal") as RescueUrgency,
+    latitude: payload.latitude,
+    longitude: payload.longitude,
+    needs: {
+      water: Boolean(payload.needs?.water),
+      food: Boolean(payload.needs?.food),
+      medical: Boolean(payload.needs?.medical),
+      shelter: Boolean(payload.needs?.shelter),
+      evacuation: Boolean(payload.needs?.evacuation),
+      other: payload.needs?.other ?? null,
+    },
+    note: payload.note ?? null,
+    photoUrl: payload.photoUrl ?? payload.photo_url ?? null,
+    createdAt: payload.createdAt ?? payload.created_at,
+    updatedAt: payload.updatedAt ?? payload.updated_at,
+  });
+
+  const loadRescuePins = async () => {
+    setRescueLoading(true);
+    setRescueError(null);
+    try {
+      const response = await fetch("/api/rescue-requests?status=all", {
+        cache: "no-store",
+      });
+      if (!response.ok) {
+        throw new Error(`Failed to load rescues (${response.status})`);
+      }
+      const data = (await response.json()) as any[];
+      setRescuePins(data.map(toRescuePin));
+    } catch (error: unknown) {
+      console.error("Failed to load rescue pins", error);
+      setRescueError("Unable to load rescue pins");
+      toast.error("Unable to load rescue pins");
+    } finally {
+      setRescueLoading(false);
+    }
+  };
+
+  const updateRescueSource = (mapInstance: maplibregl.Map) => {
+    const source = mapInstance.getSource("rescue-pins") as
+      | maplibregl.GeoJSONSource
+      | undefined;
+    if (!source) return;
+
+    const filtered = rescuePinsRef.current.filter((pin) => {
+      const matchesUrgency =
+        rescueFilters.urgency === "all" ||
+        pin.urgency === rescueFilters.urgency;
+      const matchesStatus =
+        rescueFilters.status === "all" || pin.status === rescueFilters.status;
+      return matchesUrgency && matchesStatus;
+    });
+
+    const features = filtered.map((pin) => ({
+      type: "Feature" as const,
+      geometry: {
+        type: "Point" as const,
+        coordinates: [pin.longitude, pin.latitude],
+      },
+      properties: {
+        id: pin.id,
+        urgency: pin.urgency,
+        status: pin.status,
+        name: pin.name || "Rescue request",
+      },
+    }));
+
+    source.setData({
+      type: "FeatureCollection",
+      features,
+    });
+  };
+
+  // Add rescue layer and interactions
+  useEffect(() => {
+    if (!map.current) return;
+
+    const mapInstance = map.current;
+
+    const ensureRescueLayer = () => {
+      if (!mapInstance.getSource("rescue-pins")) {
+        mapInstance.addSource("rescue-pins", {
+          type: "geojson",
+          data: { type: "FeatureCollection", features: [] },
+        });
+      }
+
+      if (!mapInstance.getLayer("rescue-pins")) {
+        mapInstance.addLayer({
+          id: "rescue-pins",
+          type: "circle",
+          source: "rescue-pins",
+          paint: {
+            "circle-radius": 8,
+            "circle-color": [
+              "match",
+              ["get", "urgency"],
+              "critical",
+              "#ef4444",
+              "high",
+              "#f59e0b",
+              "normal",
+              "#22c55e",
+              "#9ca3af",
+            ],
+            "circle-stroke-color": "#ffffff",
+            "circle-stroke-width": 1.5,
+            "circle-opacity": 0.9,
+          },
+        });
+      }
+
+      const handleEnter = () => {
+        mapInstance.getCanvas().style.cursor = "pointer";
+      };
+      const handleLeave = () => {
+        mapInstance.getCanvas().style.cursor = "";
+      };
+
+      mapInstance.on("click", "rescue-pins", handleRescueClickCallback);
+      mapInstance.on("mouseenter", "rescue-pins", handleEnter);
+      mapInstance.on("mouseleave", "rescue-pins", handleLeave);
+
+      return () => {
+        mapInstance.off("click", "rescue-pins", handleRescueClickCallback);
+        mapInstance.off("mouseenter", "rescue-pins", handleEnter);
+        mapInstance.off("mouseleave", "rescue-pins", handleLeave);
+      };
+    };
+
+    let cleanup: (() => void) | undefined;
+
+    if (mapInstance.loaded()) {
+      cleanup = ensureRescueLayer();
+      updateRescueSource(mapInstance);
+    } else {
+      mapInstance.once("load", () => {
+        cleanup = ensureRescueLayer();
+        updateRescueSource(mapInstance);
+      });
+    }
+
+    return () => {
+      if (cleanup) cleanup();
+    };
+  }, [handleRescueClickCallback]);
+
+  useEffect(() => {
+    if (!map.current) return;
+    updateRescueSource(map.current);
+  }, [rescuePins, rescueFilters]);
+
+  useEffect(() => {
+    if (!map.current) return;
+
+    const handler = (e: maplibregl.MapMouseEvent) => {
+      if (!pinMode) return;
+      const coords = { latitude: e.lngLat.lat, longitude: e.lngLat.lng };
+      setDraftCoords(coords);
+      setRescueModalOpen(true);
+      setSelectedRescue(null);
+    };
+
+    map.current.on("click", handler);
+    return () => {
+      map.current?.off("click", handler);
+    };
+  }, [pinMode]);
+
+  useEffect(() => {
+    if (!map.current) return;
+
+    if (draftCoords) {
+      if (!draftMarker.current) {
+        draftMarker.current = new maplibregl.Marker({ color: "#ef4444" })
+          .setLngLat([draftCoords.longitude, draftCoords.latitude])
+          .addTo(map.current);
+      } else {
+        draftMarker.current.setLngLat([
+          draftCoords.longitude,
+          draftCoords.latitude,
+        ]);
+      }
+    } else if (draftMarker.current) {
+      draftMarker.current.remove();
+      draftMarker.current = null;
+    }
+  }, [draftCoords]);
 
   // Create 4-layer typhoon system when storms are loaded
   useEffect(() => {
@@ -751,6 +1124,35 @@ export function MapView({ category }: MapViewProps) {
 
       {/* Date Picker Popover - Top Right */}
       <div className="absolute top-4 right-16 z-10 flex gap-2">
+        <Button
+          variant={pinMode ? "default" : "outline"}
+          size="sm"
+          onClick={() => {
+            setPinMode(!pinMode);
+            if (!pinMode) {
+              setDraftCoords(null);
+              setSelectedRescue(null);
+              setRescueModalOpen(false);
+              toast.info(
+                "Pinning mode activated - tap on the map to place a rescue request",
+              );
+            } else {
+              toast.dismiss();
+            }
+          }}
+          className={`h-11 w-11 shadow-lg ${
+            pinMode
+              ? "bg-[#6B1515] hover:bg-[#6B1515]/90 text-white"
+              : "bg-white border-gray-300"
+          }`}
+        >
+          {pinMode ? (
+            <MapPin className="h-4 w-4 animate-pulse" />
+          ) : (
+            <MapPin className="h-4 w-4" />
+          )}
+        </Button>
+
         <Popover open={datePickerOpen} onOpenChange={setDatePickerOpen}>
           <PopoverTrigger asChild>
             <Button
@@ -780,6 +1182,211 @@ export function MapView({ category }: MapViewProps) {
         >
           <RefreshCw
             className={`h-4 w-4 ${typhoonLoading ? "animate-spin" : ""}`}
+          />
+        </Button>
+
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => loadRescuePins()}
+          disabled={rescueLoading}
+          className="h-11 w-11 bg-white shadow-lg border-gray-300"
+          title="Refresh rescue requests"
+        >
+          <RefreshCw
+            className={`h-4 w-4 ${rescueLoading ? "animate-spin" : ""}`}
+          />
+        </Button>
+      </div>
+
+      {/* Rescue Filters - Below Controls */}
+      <div className="absolute top-20 right-4 z-10 bg-white shadow-lg rounded-lg p-3 max-w-72">
+        <div className="flex items-center gap-2 mb-2 text-xs font-semibold text-gray-700">
+          <Filter className="h-3 w-3" />
+          Rescue Filters
+        </div>
+        <div className="space-y-2">
+          <div className="flex items-center gap-2">
+            <label className="text-xs font-medium text-gray-600 w-16">
+              Urgency:
+            </label>
+            <Select
+              value={rescueFilters.urgency}
+              onValueChange={(value) =>
+                setRescueFilters({
+                  ...rescueFilters,
+                  urgency: value as any,
+                })
+              }
+            >
+              <SelectTrigger className="h-8 text-xs w-32">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All</SelectItem>
+                <SelectItem value="normal">Normal</SelectItem>
+                <SelectItem value="high">High</SelectItem>
+                <SelectItem value="critical">Critical</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="flex items-center gap-2">
+            <label className="text-xs font-medium text-gray-600 w-16">
+              Status:
+            </label>
+            <Select
+              value={rescueFilters.status}
+              onValueChange={(value) =>
+                setRescueFilters({
+                  ...rescueFilters,
+                  status: value as any,
+                })
+              }
+            >
+              <SelectTrigger className="h-8 text-xs w-32">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All</SelectItem>
+                <SelectItem value="open">Open</SelectItem>
+                <SelectItem value="in_progress">In Progress</SelectItem>
+                <SelectItem value="resolved">Resolved</SelectItem>
+                <SelectItem value="cancelled">Cancelled</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+      </div>
+
+      {/* Rescue Pin Modal for Create/View */}
+      {rescueModalOpen && (draftCoords || selectedRescue) && (
+        <RescuePinModal
+          open={rescueModalOpen}
+          onOpenChange={(open: boolean) => {
+            setRescueModalOpen(open);
+            if (!open) {
+              setDraftCoords(null);
+              setPinMode(false);
+              setSelectedRescue(null);
+            }
+          }}
+          coords={draftCoords}
+          pin={selectedRescue}
+          onCreateSuccess={(newPin: RescuePin) => {
+            setRescuePins([...rescuePins, newPin]);
+            setRescueModalOpen(false);
+            setDraftCoords(null);
+            setPinMode(false);
+            setSelectedRescue(null);
+            toast.success("Rescue request created!");
+          }}
+          onUrgencyChange={async (urgency: RescueUrgency) => {
+            if (!selectedRescue) return;
+            setUpdatingUrgencyId(selectedRescue.id);
+            try {
+              const response = await fetch(
+                `/api/rescue-requests/${selectedRescue.id}`,
+                {
+                  method: "PATCH",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({ urgency }),
+                },
+              );
+              if (!response.ok) {
+                throw new Error("Failed to update urgency");
+              }
+              const updated = await response.json();
+              setRescuePins(
+                rescuePins.map((p) =>
+                  p.id === updated.id ? toRescuePin(updated) : p,
+                ),
+              );
+              setSelectedRescue(toRescuePin(updated));
+              toast.success("Urgency updated");
+            } catch (error: unknown) {
+              console.error("Error updating urgency", error);
+              toast.error("Failed to update urgency");
+            } finally {
+              setUpdatingUrgencyId(null);
+            }
+          }}
+          updatingUrgency={updatingUrgencyId === selectedRescue?.id}
+        />
+      )}
+
+      {/* Date Picker Popover - Top Right */}
+      <div className="absolute top-4 right-16 z-10 flex gap-2">
+        <Button
+          variant={pinMode ? "default" : "outline"}
+          size="sm"
+          onClick={() => {
+            setPinMode(!pinMode);
+            if (!pinMode) {
+              setDraftCoords(null);
+              setSelectedRescue(null);
+              setRescueModalOpen(false);
+              toast.info(
+                "Pinning mode activated - tap on the map to place a rescue request",
+              );
+            } else {
+              toast.dismiss();
+            }
+          }}
+          className={`h-11 w-11 shadow-lg ${
+            pinMode
+              ? "bg-[#6B1515] hover:bg-[#6B1515]/90 text-white"
+              : "bg-white border-gray-300"
+          }`}
+        >
+          {pinMode ? (
+            <MapPin className="h-4 w-4 animate-pulse" />
+          ) : (
+            <MapPin className="h-4 w-4" />
+          )}
+        </Button>
+
+        <Popover open={datePickerOpen} onOpenChange={setDatePickerOpen}>
+          <PopoverTrigger asChild>
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-11 w-11 bg-white shadow-lg border-gray-300"
+            >
+              <CalendarIcon className="h-4 w-4" />
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent className="w-auto p-0" align="end">
+            <Calendar
+              mode="single"
+              selected={selectedDate}
+              onSelect={handleDateChange}
+              disabled={(date) => date > new Date()}
+            />
+          </PopoverContent>
+        </Popover>
+
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => loadStormsFor(selectedDate)}
+          disabled={typhoonLoading}
+          className="h-11 w-11 bg-white shadow-lg border-gray-300"
+        >
+          <RefreshCw
+            className={`h-4 w-4 ${typhoonLoading ? "animate-spin" : ""}`}
+          />
+        </Button>
+
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => loadRescuePins()}
+          disabled={rescueLoading}
+          className="h-11 w-11 bg-white shadow-lg border-gray-300"
+          title="Refresh rescue requests"
+        >
+          <RefreshCw
+            className={`h-4 w-4 ${rescueLoading ? "animate-spin" : ""}`}
           />
         </Button>
       </div>
@@ -1038,7 +1645,7 @@ function updateActiveStorm(
   try {
     mapInstance.easeTo({
       center: activePoint.coordinates,
-      zoom: Math.max(mapInstance.getZoom(), 10),
+      zoom: Math.max(mapInstance.getZoom(), 2),
       duration: 800,
     });
   } catch (err) {

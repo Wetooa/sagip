@@ -18,6 +18,7 @@ from sqlalchemy import (
 )
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
+from sqlalchemy.orm import relationship as sa_relationship
 import enum
 
 from app.core.database import Base
@@ -170,4 +171,4 @@ class FamilyMember(Base):
     )
 
     # Relationships
-    census_data = relationship("CensusData", back_populates="family_members")
+    census_data = sa_relationship("CensusData", back_populates="family_members")

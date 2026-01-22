@@ -17,12 +17,13 @@ from app.models.rescue_request import (
     RescueRequestStatus,
     RescueUrgency,
 )
-from app.schemas.rescue import RescueNeeds, RescueRequestResponse
+from app.schemas.rescue import RescueNeeds, RescueRequestResponse, RescueRequestUpdate
 from app.utils.helpers import paginate_query, not_found_error, validation_error
 
 router = APIRouter()
 
 UPLOAD_DIR = Path("app/static/rescue_photos")
+MAX_PHOTO_SIZE_BYTES = 5 * 1024 * 1024  # 5 MB cap to avoid oversized uploads
 
 
 def _normalize_needs(raw_needs: str) -> dict:
@@ -46,6 +47,21 @@ def _normalize_needs(raw_needs: str) -> dict:
     return cleaned
 
 
+def _validate_photo_size(photo: UploadFile) -> None:
+    """Reject oversized uploads to protect the server."""
+    try:
+        current_pos = photo.file.tell()
+        photo.file.seek(0, 2)
+        size = photo.file.tell()
+        photo.file.seek(current_pos)
+    except Exception:
+        # If size cannot be determined, skip size validation
+        return
+
+    if size > MAX_PHOTO_SIZE_BYTES:
+        raise validation_error("photo must be under 5MB")
+
+
 def _persist_photo(photo: UploadFile) -> str:
     """Persist an uploaded photo to disk and return a relative URL."""
     if not photo.filename:
@@ -54,10 +70,18 @@ def _persist_photo(photo: UploadFile) -> str:
     if photo.content_type and not photo.content_type.startswith("image/"):
         raise validation_error("photo must be an image file")
 
+    _validate_photo_size(photo)
+
     UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
     suffix = Path(photo.filename).suffix or ".jpg"
     file_name = f"{uuid4()}{suffix}"
     file_path = UPLOAD_DIR / file_name
+
+    # Rewind to start before persisting in case size check moved the cursor
+    try:
+        photo.file.seek(0)
+    except Exception:
+        pass
 
     with file_path.open("wb") as buffer:
         shutil.copyfileobj(photo.file, buffer)
@@ -132,7 +156,7 @@ async def create_rescue_request(
 
 @router.get("/requests", response_model=list[RescueRequestResponse])
 async def list_rescue_requests(
-    status: str = Query("open", description="Filter by status"),
+    status: str = Query("open", description="Filter by status or 'all' to disable"),
     limit: int = Query(100, ge=1, le=500, description="Maximum results"),
     offset: int = Query(0, ge=0, description="Results to skip"),
     db: Session = Depends(get_db),
@@ -140,7 +164,7 @@ async def list_rescue_requests(
     """List rescue requests, defaulting to open ones for map display."""
     query = db.query(RescueRequest)
 
-    if status:
+    if status and status != "all":
         try:
             status_enum = RescueRequestStatus(status)
         except ValueError:
@@ -160,4 +184,38 @@ async def get_rescue_request(rescue_id: UUID, db: Session = Depends(get_db)):
     rescue = db.query(RescueRequest).filter(RescueRequest.id == rescue_id).first()
     if not rescue:
         raise not_found_error("Rescue request", str(rescue_id))
+    return _serialize(rescue)
+
+
+@router.patch("/requests/{rescue_id}", response_model=RescueRequestResponse)
+async def update_rescue_request(
+    rescue_id: UUID,
+    payload: RescueRequestUpdate,
+    db: Session = Depends(get_db),
+    current_user: Optional[Citizen] = Depends(get_current_user_optional),
+):
+    """Update urgency, status, or note for a rescue request."""
+    rescue = db.query(RescueRequest).filter(RescueRequest.id == rescue_id).first()
+    if not rescue:
+        raise not_found_error("Rescue request", str(rescue_id))
+
+    if payload.urgency is not None:
+        try:
+            rescue.urgency = RescueUrgency(payload.urgency)
+        except ValueError:
+            raise validation_error(f"Invalid urgency: {payload.urgency}")
+
+    if payload.status is not None:
+        try:
+            rescue.status = RescueRequestStatus(payload.status)
+        except ValueError:
+            raise validation_error(f"Invalid status: {payload.status}")
+
+    if payload.note is not None:
+        rescue.note = payload.note
+
+    db.add(rescue)
+    db.commit()
+    db.refresh(rescue)
+
     return _serialize(rescue)

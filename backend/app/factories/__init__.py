@@ -14,6 +14,7 @@ from app.factories.emergency import (
     RollCallResponseFactory,
     RescueDispatchFactory,
 )
+from app.factories.rescue import RescueRequestFactory
 from app.factories.monitoring import WaterLevelReadingFactory
 from app.factories.communication import (
     ChatbotConversationFactory,
@@ -48,6 +49,8 @@ __all__ = [
     "RollCallFactory",
     "RollCallResponseFactory",
     "RescueDispatchFactory",
+    "RescueRequestFactory",
+    "WaterLevelReadingFactory",
     "WaterLevelReadingFactory",
     "ChatbotConversationFactory",
     "NotificationFactory",
