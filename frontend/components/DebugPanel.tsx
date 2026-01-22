@@ -39,7 +39,9 @@ export default function DebugPanel({
         setExpiryTime("Expired");
       } else {
         const hours = Math.floor(remaining / (60 * 60 * 1000));
-        const minutes = Math.floor((remaining % (60 * 60 * 1000)) / (60 * 1000));
+        const minutes = Math.floor(
+          (remaining % (60 * 60 * 1000)) / (60 * 1000),
+        );
         setExpiryTime(`Expires: ${hours}h ${minutes}m`);
       }
     };

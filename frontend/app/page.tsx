@@ -204,7 +204,7 @@ export default function Home() {
               setDriftPin(newDriftPin);
               localStorage.setItem(
                 "urgentHelpLostSignal",
-                JSON.stringify(newDriftPin)
+                JSON.stringify(newDriftPin),
               );
             }}
             onDeleteDrift={() => {

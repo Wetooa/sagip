@@ -267,8 +267,16 @@ export default function HazardMapping({ driftPin }: HazardMappingProps) {
           if (!mapInstance) return;
           try {
             mapInstance.off("click", "drift-predictions", handleDriftClick);
-            mapInstance.off("mouseenter", "drift-predictions", handleDriftEnter);
-            mapInstance.off("mouseleave", "drift-predictions", handleDriftLeave);
+            mapInstance.off(
+              "mouseenter",
+              "drift-predictions",
+              handleDriftEnter,
+            );
+            mapInstance.off(
+              "mouseleave",
+              "drift-predictions",
+              handleDriftLeave,
+            );
           } catch (e) {
             // Map may be unloading, ignore
           }
