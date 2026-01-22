@@ -269,10 +269,10 @@ export function MapView({ category }: MapViewProps) {
 
   const toRescuePin = (payload: any): RescuePin => ({
     id: payload.id,
-    citizenId: payload.citizen_id ?? null,
+    citizenId: payload.citizenId ?? payload.citizen_id ?? null,
     name: payload.name ?? null,
     contact: payload.contact ?? null,
-    householdSize: payload.household_size ?? null,
+    householdSize: payload.householdSize ?? payload.household_size ?? null,
     status: (payload.status || "open") as RescueStatus,
     urgency: (payload.urgency || "normal") as RescueUrgency,
     latitude: payload.latitude,
@@ -286,9 +286,9 @@ export function MapView({ category }: MapViewProps) {
       other: payload.needs?.other ?? null,
     },
     note: payload.note ?? null,
-    photoUrl: payload.photo_url ?? null,
-    createdAt: payload.created_at,
-    updatedAt: payload.updated_at,
+    photoUrl: payload.photoUrl ?? payload.photo_url ?? null,
+    createdAt: payload.createdAt ?? payload.created_at,
+    updatedAt: payload.updatedAt ?? payload.updated_at,
   });
 
   const loadRescuePins = async () => {
@@ -986,6 +986,7 @@ export function MapView({ category }: MapViewProps) {
             if (!open) {
               setDraftCoords(null);
               setPinMode(false);
+              setSelectedRescue(null);
             }
           }}
           coords={draftCoords}
@@ -995,6 +996,7 @@ export function MapView({ category }: MapViewProps) {
             setRescueModalOpen(false);
             setDraftCoords(null);
             setPinMode(false);
+            setSelectedRescue(null);
             toast.success("Rescue request created!");
           }}
           onUrgencyChange={async (urgency: RescueUrgency) => {
@@ -1029,145 +1031,6 @@ export function MapView({ category }: MapViewProps) {
           }}
           updatingUrgency={updatingUrgencyId === selectedRescue?.id}
         />
-      )}
-
-      {/* Rescue Pin Detail Popup */}
-      {selectedRescue && !rescueModalOpen && (
-        <div className="absolute bottom-32 left-4 z-20 bg-white rounded-lg shadow-lg p-4 max-w-sm">
-          <div className="flex justify-between items-start mb-3">
-            <div>
-              <h3 className="font-semibold text-gray-900">
-                {selectedRescue.name || "Rescue Request"}
-              </h3>
-              <p className="text-xs text-gray-500">
-                {selectedRescue.contact && `📱 ${selectedRescue.contact}`}
-              </p>
-            </div>
-            <button
-              onClick={() => setSelectedRescue(null)}
-              className="text-gray-400 hover:text-gray-600"
-            >
-              <X className="h-4 w-4" />
-            </button>
-          </div>
-
-          <div className="mb-2 flex flex-wrap gap-1">
-            <Badge
-              className={`text-xs font-semibold ${
-                selectedRescue.urgency === "critical"
-                  ? "bg-red-100 text-red-800"
-                  : selectedRescue.urgency === "high"
-                    ? "bg-amber-100 text-amber-800"
-                    : "bg-green-100 text-green-800"
-              }`}
-            >
-              {selectedRescue.urgency.toUpperCase()}
-            </Badge>
-            <Badge variant="outline" className="text-xs">
-              {selectedRescue.status.replace(/_/g, " ")}
-            </Badge>
-          </div>
-
-          {selectedRescue.needs && (
-            <div className="mb-2">
-              <p className="text-xs font-medium text-gray-700 mb-1">Needs:</p>
-              <div className="flex flex-wrap gap-1">
-                {selectedRescue.needs.water && (
-                  <Badge variant="secondary" className="text-xs">
-                    Water
-                  </Badge>
-                )}
-                {selectedRescue.needs.food && (
-                  <Badge variant="secondary" className="text-xs">
-                    Food
-                  </Badge>
-                )}
-                {selectedRescue.needs.medical && (
-                  <Badge variant="secondary" className="text-xs">
-                    Medical
-                  </Badge>
-                )}
-                {selectedRescue.needs.shelter && (
-                  <Badge variant="secondary" className="text-xs">
-                    Shelter
-                  </Badge>
-                )}
-                {selectedRescue.needs.evacuation && (
-                  <Badge variant="secondary" className="text-xs">
-                    Evacuation
-                  </Badge>
-                )}
-              </div>
-            </div>
-          )}
-
-          {selectedRescue.note && (
-            <p className="text-xs text-gray-600 mb-3 italic">
-              "{selectedRescue.note}"
-            </p>
-          )}
-
-          {selectedRescue.photoUrl && (
-            <img
-              src={selectedRescue.photoUrl}
-              alt="Rescue location"
-              className="w-full h-24 object-cover rounded mb-2"
-            />
-          )}
-
-          <div className="flex gap-2">
-            <Button
-              size="sm"
-              variant="outline"
-              className="flex-1 text-xs"
-              onClick={() => setRescueModalOpen(true)}
-            >
-              View Details
-            </Button>
-            <Select
-              value={selectedRescue.urgency}
-              onValueChange={async (value) => {
-                await setUpdatingUrgencyId(selectedRescue.id);
-                try {
-                  const response = await fetch(
-                    `/api/rescue-requests/${selectedRescue.id}`,
-                    {
-                      method: "PATCH",
-                      headers: { "Content-Type": "application/json" },
-                      body: JSON.stringify({ urgency: value }),
-                    },
-                  );
-                  if (!response.ok) {
-                    throw new Error("Failed to update urgency");
-                  }
-                  const updated = await response.json();
-                  setRescuePins(
-                    rescuePins.map((p) =>
-                      p.id === updated.id ? toRescuePin(updated) : p,
-                    ),
-                  );
-                  setSelectedRescue(toRescuePin(updated));
-                  toast.success("Urgency updated");
-                } catch (error: unknown) {
-                  console.error("Error updating urgency", error);
-                  toast.error("Failed to update urgency");
-                } finally {
-                  setUpdatingUrgencyId(null);
-                }
-              }}
-              disabled={updatingUrgencyId !== null}
-            >
-              <SelectTrigger className="h-8 text-xs flex-1">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="normal">Normal</SelectItem>
-                <SelectItem value="high">High</SelectItem>
-                <SelectItem value="critical">Critical</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-        </div>
       )}
 
       {/* Date Picker Popover - Top Right */}

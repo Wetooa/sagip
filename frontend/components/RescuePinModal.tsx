@@ -187,172 +187,121 @@ export function RescuePinModal({
       <Sheet open={open} onOpenChange={onOpenChange}>
         <SheetContent
           side="bottom"
-          className="h-[80vh] max-h-160 w-full rounded-t-3xl border-none p-0 sm:max-w-lg"
+          className="h-[60vh] max-h-120 w-full rounded-t-3xl border-none p-0 sm:max-w-lg"
         >
-          <SheetHeader className="p-4 pb-2">
-            <div className="flex items-center gap-2 text-xs text-muted-foreground">
-              <AlertTriangle className="h-4 w-4 text-[#6B1515]" />
-              Rescue Request Details
-            </div>
+          <SheetHeader className="p-4 pb-0">
             <SheetTitle className="text-lg font-semibold text-[#6B1515]">
               {pin.name || "Rescue Request"}
             </SheetTitle>
-            <SheetDescription className="text-sm">
-              Location:{" "}
-              {formatCoords({
-                latitude: pin.latitude,
-                longitude: pin.longitude,
-              })}
-            </SheetDescription>
+            <div className="flex items-center gap-2 mt-1">
+              <Badge
+                className={`text-[10px] font-bold px-1.5 h-4 ${
+                  pin.urgency === "critical"
+                    ? "bg-red-600 text-white"
+                    : pin.urgency === "high"
+                      ? "bg-amber-500 text-white"
+                      : "bg-green-500 text-white"
+                }`}
+              >
+                {pin.urgency.toUpperCase()}
+              </Badge>
+              <SheetDescription className="text-xs">
+                {formatCoords({
+                  latitude: pin.latitude,
+                  longitude: pin.longitude,
+                })}
+              </SheetDescription>
+            </div>
           </SheetHeader>
 
-          <div className="px-4 pb-4 space-y-4 overflow-y-auto max-h-[calc(80vh-120px)]">
-            {pin.contact && (
-              <div>
-                <Label className="text-xs font-semibold text-gray-700">
-                  Contact
-                </Label>
-                <p className="text-sm text-gray-900">{pin.contact}</p>
+          <div className="px-4 py-4 space-y-4 overflow-y-auto max-h-[calc(60vh-80px)]">
+            {pin.photoUrl && (
+              <div className="relative aspect-video w-full rounded-xl overflow-hidden shadow-sm">
+                <img
+                  src={pin.photoUrl}
+                  alt="Rescue location"
+                  className="w-full h-full object-cover"
+                />
               </div>
             )}
 
-            {pin.householdSize && (
-              <div>
-                <Label className="text-xs font-semibold text-gray-700">
-                  Household Size
-                </Label>
-                <p className="text-sm text-gray-900">
-                  {pin.householdSize} people
-                </p>
-              </div>
-            )}
+            <div className="grid grid-cols-2 gap-4">
+              {pin.contact && (
+                <div>
+                  <Label className="text-[10px] uppercase tracking-wider font-bold text-gray-500">
+                    Contact
+                  </Label>
+                  <p className="text-sm font-medium text-gray-900">
+                    {pin.contact}
+                  </p>
+                </div>
+              )}
 
-            <div className="flex items-center gap-3">
-              <div>
-                <Label className="text-xs font-semibold text-gray-700">
-                  Urgency
-                </Label>
-                <p className="text-sm text-gray-900 mb-2">{pin.urgency}</p>
-              </div>
-              <RadioGroup
-                value={pin.urgency}
-                onValueChange={(value) => {
-                  onUrgencyChange(value as "normal" | "high" | "critical");
-                }}
-                disabled={updatingUrgency}
-              >
-                <div className="flex items-center space-x-2">
-                  <RadioGroupItem
-                    value="normal"
-                    id="urgency-normal"
-                    disabled={updatingUrgency}
-                  />
-                  <Label
-                    htmlFor="urgency-normal"
-                    className="text-xs cursor-pointer"
-                  >
-                    Normal
+              {pin.householdSize && (
+                <div>
+                  <Label className="text-[10px] uppercase tracking-wider font-bold text-gray-500">
+                    Household
                   </Label>
+                  <p className="text-sm font-medium text-gray-900">
+                    {pin.householdSize} people
+                  </p>
                 </div>
-                <div className="flex items-center space-x-2">
-                  <RadioGroupItem
-                    value="high"
-                    id="urgency-high"
-                    disabled={updatingUrgency}
-                  />
-                  <Label
-                    htmlFor="urgency-high"
-                    className="text-xs cursor-pointer"
-                  >
-                    High
-                  </Label>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <RadioGroupItem
-                    value="critical"
-                    id="urgency-critical"
-                    disabled={updatingUrgency}
-                  />
-                  <Label
-                    htmlFor="urgency-critical"
-                    className="text-xs cursor-pointer"
-                  >
-                    Critical
-                  </Label>
-                </div>
-              </RadioGroup>
-              {updatingUrgency && (
-                <Loader2 className="h-4 w-4 animate-spin text-[#6B1515]" />
               )}
             </div>
 
             <div>
-              <Label className="text-xs font-semibold text-gray-700 mb-2 block">
+              <Label className="text-[10px] uppercase tracking-wider font-bold text-gray-500 mb-1.5 block">
                 Needs
               </Label>
-              <div className="flex flex-wrap gap-2">
-                {pin.needs.water && <Badge variant="secondary">Water</Badge>}
-                {pin.needs.food && <Badge variant="secondary">Food</Badge>}
+              <div className="flex flex-wrap gap-1.5">
+                {pin.needs.water && (
+                  <Badge
+                    variant="secondary"
+                    className="bg-blue-50 text-blue-700 border-blue-100"
+                  >
+                    Water
+                  </Badge>
+                )}
+                {pin.needs.food && (
+                  <Badge
+                    variant="secondary"
+                    className="bg-orange-50 text-orange-700 border-orange-100"
+                  >
+                    Food
+                  </Badge>
+                )}
                 {pin.needs.medical && (
-                  <Badge variant="secondary">Medical</Badge>
+                  <Badge
+                    variant="secondary"
+                    className="bg-red-50 text-red-700 border-red-100"
+                  >
+                    Medical
+                  </Badge>
                 )}
                 {pin.needs.shelter && (
-                  <Badge variant="secondary">Shelter</Badge>
+                  <Badge
+                    variant="secondary"
+                    className="bg-purple-50 text-purple-700 border-purple-100"
+                  >
+                    Shelter
+                  </Badge>
                 )}
                 {pin.needs.evacuation && (
-                  <Badge variant="secondary">Evacuation</Badge>
+                  <Badge
+                    variant="secondary"
+                    className="bg-amber-50 text-amber-700 border-amber-100"
+                  >
+                    Evacuation
+                  </Badge>
                 )}
               </div>
             </div>
 
             {pin.note && (
-              <div>
-                <Label className="text-xs font-semibold text-gray-700">
-                  Notes
-                </Label>
-                <p className="text-sm text-gray-900 italic">"{pin.note}"</p>
+              <div className="bg-gray-50 p-3 rounded-lg border border-gray-100 italic">
+                <p className="text-sm text-gray-700">"{pin.note}"</p>
               </div>
             )}
-
-            {pin.photoUrl && (
-              <div>
-                <Label className="text-xs font-semibold text-gray-700 mb-2 block">
-                  Photo
-                </Label>
-                <img
-                  src={pin.photoUrl}
-                  alt="Rescue location"
-                  className="w-full h-40 object-cover rounded-lg"
-                />
-              </div>
-            )}
-
-            <div>
-              <Label className="text-xs font-semibold text-gray-700">
-                Status
-              </Label>
-              <p className="text-sm text-gray-900 capitalize">
-                {pin.status.replace(/_/g, " ")}
-              </p>
-            </div>
-
-            <div>
-              <Label className="text-xs font-semibold text-gray-700">
-                Created
-              </Label>
-              <p className="text-sm text-gray-900">
-                {new Date(pin.createdAt).toLocaleString()}
-              </p>
-            </div>
-          </div>
-
-          <div className="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-white to-transparent border-t">
-            <Button
-              onClick={() => onOpenChange(false)}
-              className="w-full bg-[#6B1515] hover:bg-[#6B1515]/90"
-            >
-              Close
-            </Button>
           </div>
         </SheetContent>
       </Sheet>
@@ -583,7 +532,7 @@ export function RescuePinModal({
           )}
         </div>
 
-        <div className="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-white via-white to-transparent border-t space-y-2">
+        <div className="absolute bottom-0 left-0 right-0 p-4 bg-linear-to-t from-white via-white to-transparent border-t space-y-2">
           <Button
             onClick={handleSubmit}
             disabled={submitting}
