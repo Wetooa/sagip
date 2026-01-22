@@ -57,6 +57,12 @@ class SOSSignalCreate(SOSSignalBase):
     received_at: datetime
 
 
+class SOSSignalUpdate(BaseSchema):
+    """Schema for updating an SOS signal."""
+    status: Optional[str] = None
+    resolved_at: Optional[datetime] = None
+
+
 class SOSSignalResponse(SOSSignalBase, TimestampSchema):
     """Schema for SOS signal response."""
     id: UUID

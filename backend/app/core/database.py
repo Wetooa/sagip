@@ -7,8 +7,9 @@ from typing import Generator
 from app.core.config import settings
 
 # Create database engine with connection pooling
+# Use the database_url property which constructs the URL from components or uses DATABASE_URL if provided
 engine = create_engine(
-    settings.DATABASE_URL,
+    settings.database_url,
     pool_size=settings.DB_POOL_SIZE,
     max_overflow=settings.DB_MAX_OVERFLOW,
     pool_pre_ping=True,  # Verify connections before using

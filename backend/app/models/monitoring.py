@@ -1,4 +1,5 @@
 """Monitoring-related database models."""
+
 import uuid
 from datetime import datetime
 from sqlalchemy import Column, String, Float, DateTime, Enum as SQLEnum, JSON, Index
@@ -10,6 +11,7 @@ from app.core.database import Base
 
 class SensorStatus(str, enum.Enum):
     """Sensor status enumeration."""
+
     ACTIVE = "active"
     MAINTENANCE = "maintenance"
     OFFLINE = "offline"
@@ -17,6 +19,7 @@ class SensorStatus(str, enum.Enum):
 
 class WaterLevelReading(Base):
     """Water level sensor reading model."""
+
     __tablename__ = "water_level_readings"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
@@ -27,5 +30,7 @@ class WaterLevelReading(Base):
     water_level_cm = Column(Float, nullable=False)
     reading_timestamp = Column(DateTime, nullable=False, index=True)
     sensor_status = Column(SQLEnum(SensorStatus), nullable=False)
-    metadata = Column(JSON, nullable=True)
+    sensor_metadata = Column(
+        JSON, nullable=True
+    )  # Renamed from 'metadata' to avoid SQLAlchemy conflict
     created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
