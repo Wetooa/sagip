@@ -8,6 +8,7 @@ from app.models.emergency import Incident, SOSSignal, RollCall, RollCallResponse
 from app.models.post_disaster import NeedsTicket, HealthReport, HealthCluster, MedicalDispatch
 from app.models.communication import ChatbotConversation, Notification, MeshPacket
 from app.models.nice_to_have import Asset, Volunteer, DonationFund, ExternalHelpRequest, CrowdsourcedHazard
+from app.models.rescue_request import RescueRequest, RescueRequestStatus, RescueUrgency
 
 __all__ = [
     "Base",
@@ -36,4 +37,7 @@ __all__ = [
     "DonationFund",
     "ExternalHelpRequest",
     "CrowdsourcedHazard",
+    "RescueRequest",
+    "RescueRequestStatus",
+    "RescueUrgency",
 ]

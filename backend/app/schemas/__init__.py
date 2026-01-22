@@ -20,6 +20,12 @@ from app.schemas.emergency import (
     RollCallResponseBase, RollCallResponseCreate, RollCallResponseItem,
     RescueDispatchBase, RescueDispatchCreate, RescueDispatchResponse
 )
+from app.schemas.rescue import (
+    RescueNeeds,
+    RescueRequestBase,
+    RescueRequestCreate,
+    RescueRequestResponse,
+)
 from app.schemas.post_disaster import (
     NeedsTicketBase, NeedsTicketCreate, NeedsTicketUpdate, NeedsTicketResponse,
     HealthReportBase, HealthReportCreate, HealthReportResponse,
@@ -49,6 +55,7 @@ __all__ = [
     "RollCallBase", "RollCallCreate", "RollCallResponse",
     "RollCallResponseBase", "RollCallResponseCreate", "RollCallResponseItem",
     "RescueDispatchBase", "RescueDispatchCreate", "RescueDispatchResponse",
+    "RescueNeeds", "RescueRequestBase", "RescueRequestCreate", "RescueRequestResponse",
     "NeedsTicketBase", "NeedsTicketCreate", "NeedsTicketUpdate", "NeedsTicketResponse",
     "HealthReportBase", "HealthReportCreate", "HealthReportResponse",
     "HealthClusterBase", "HealthClusterCreate", "HealthClusterResponse",
