@@ -69,10 +69,7 @@ export default function CensusPage() {
             {/* Header */}
             <header className="bg-gradient-to-r from-[#8B0000]/20 to-[#6B1515]/20 backdrop-blur-md text-white px-4 py-3 shadow-lg sticky top-0 z-10 border-b border-white/10">
               <div className="flex items-center gap-2">
-                <img src="/sagip-logo.svg" alt="SAGIP" className="w-7 h-7" />
-                <h1 className="text-lg font-bold bg-gradient-to-r from-[#ff6b6b] to-[#ff8e72] bg-clip-text text-transparent">
-                  SAGIP Census
-                </h1>
+                <img src="/logo.png" alt="SAGIP" className="h-5" />
               </div>
             </header>
 
@@ -98,7 +95,7 @@ export default function CensusPage() {
                 </p>
                 <button
                   onClick={() => setIsCensusOpen(true)}
-                  className="w-full py-3 bg-gradient-to-r from-[#ff6b6b] to-[#ff8e72] text-white rounded-xl font-semibold text-sm hover:shadow-lg hover:shadow-[#ff6b6b]/50 transition-all duration-300"
+                  className="w-full py-3 bg-gradient-to-r from-[#8B0000] to-[#6B1515] text-white rounded-xl font-semibold text-sm hover:shadow-lg hover:shadow-[#8B0000]/50 transition-all duration-300"
                 >
                   Start Registration
                 </button>

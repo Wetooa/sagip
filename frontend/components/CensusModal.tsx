@@ -613,7 +613,7 @@ export function CensusModal({ isOpen, onClose, onSubmit }: CensusModalProps) {
               }
             }}
             disabled={loading || success}
-            className="px-4 py-2 bg-gradient-to-r from-[#ff6b6b] to-[#ff8e72] hover:shadow-lg hover:shadow-[#ff6b6b]/50 text-white rounded-xl font-semibold transition-all disabled:opacity-70 flex items-center justify-center gap-2 flex-1"
+            className="px-4 py-2 bg-gradient-to-r from-[#8B0000] to-[#6B1515] hover:shadow-lg hover:shadow-[#8B0000]/50 text-white rounded-xl font-semibold transition-all disabled:opacity-70 flex items-center justify-center gap-2 flex-1"
           >
             {step === "review" ? (
               <>

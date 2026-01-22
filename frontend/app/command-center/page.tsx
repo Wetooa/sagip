@@ -13,7 +13,6 @@ import {
   TrendingUp,
   Clock,
   Zap,
-  Shield,
   Send,
   X,
   ChevronRight,
@@ -27,6 +26,7 @@ import RescueRoutes from "@/components/CommandCenter/RescueRoutes";
 import RollCall from "@/components/CommandCenter/RollCall";
 import AIAnalytics from "@/components/CommandCenter/AIAnalytics";
 import AIChatbot from "@/components/CommandCenter/AIChatbot";
+import type { DriftPredictionPin } from "@/app/page";
 
 type Panel =
   | "hazard"
@@ -48,6 +48,7 @@ export default function CommandCenter() {
   const [activePanel, setActivePanel] = useState<Panel>("hazard");
   const [isChatbotOpen, setIsChatbotOpen] = useState(false);
   const [isProfileOpen, setIsProfileOpen] = useState(false);
+  const [driftPin, setDriftPin] = useState<DriftPredictionPin | null>(null);
   const [sosAlerts, setSOSAlerts] = useState<SOSAlert[]>([
     {
       id: "1",
@@ -75,6 +76,28 @@ export default function CommandCenter() {
   const [activeRescues, setActiveRescues] = useState(12);
   const [peopleTracked, setPeopleTracked] = useState(1247);
 
+  // Load drift pin from localStorage
+  useEffect(() => {
+    const stored = localStorage.getItem("urgentHelpLostSignal");
+    if (stored) {
+      try {
+        const pin: DriftPredictionPin = JSON.parse(stored);
+        // Check if expired
+        if (pin.expiresAt > Date.now()) {
+          // Use a callback to avoid setState during render
+          queueMicrotask(() => {
+            setDriftPin(pin);
+          });
+        } else {
+          // Expired, clean up
+          localStorage.removeItem("urgentHelpLostSignal");
+        }
+      } catch (e) {
+        console.error("Failed to parse drift pin from localStorage:", e);
+      }
+    }
+  }, []);
+
   useEffect(() => {
     // Simulate real-time updates
     const interval = setInterval(() => {
@@ -89,7 +112,7 @@ export default function CommandCenter() {
   const renderPanel = () => {
     switch (activePanel) {
       case "hazard":
-        return <HazardMapping />;
+        return <HazardMapping driftPin={driftPin} />;
       case "lora":
         return <LoRaPanel alerts={sosAlerts} />;
       case "rescue":
@@ -101,7 +124,7 @@ export default function CommandCenter() {
       case "profile":
         return <ProfilePanel />;
       default:
-        return <HazardMapping />;
+        return <HazardMapping driftPin={driftPin} />;
     }
   };
 
@@ -119,20 +142,10 @@ export default function CommandCenter() {
           <div className="flex items-center justify-between">
             {/* Logo & Title */}
             <div className="flex items-center gap-4">
-              <div className="bg-white/10 backdrop-blur-sm p-3 rounded-xl border border-white/20">
-                <Shield className="w-8 h-8 text-[#F4E4C1]" />
-              </div>
-              <div>
-                <h1 className="text-2xl font-bold tracking-wide text-white flex items-center gap-2">
-                  SAGIP <span className="text-[#F4E4C1]">AI</span>
-                  <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-[#F4E4C1]/20 text-[#F4E4C1] border border-[#F4E4C1]/30">
-                    COMMAND CENTER
-                  </span>
-                </h1>
-                <p className="text-sm text-[#F4E4C1]/80">
-                  Government Emergency Operations Dashboard
-                </p>
-              </div>
+              <img src="/logo.png" alt="SAGIP" className="h-8" />
+              <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-[#F4E4C1]/20 text-[#F4E4C1] border border-[#F4E4C1]/30">
+                COMMAND CENTER
+              </span>
             </div>
 
             {/* Real-time Stats & Profile */}
@@ -191,19 +204,19 @@ export default function CommandCenter() {
           />
           <NavButton
             icon={Navigation}
-            label="Rescue"
+            label="Rescue Routes"
             active={activePanel === "rescue"}
             onClick={() => setActivePanel("rescue")}
           />
           <NavButton
             icon={Users}
-            label="Risk Tracking"
+            label="Roll Call"
             active={activePanel === "rollcall"}
             onClick={() => setActivePanel("rollcall")}
           />
           <NavButton
             icon={Activity}
-            label="Analytics"
+            label="AI Analytics"
             active={activePanel === "analytics"}
             onClick={() => setActivePanel("analytics")}
           />
@@ -237,7 +250,7 @@ export default function CommandCenter() {
               />
               <StatCard
                 icon={Users}
-                label="At Risk"
+                label="People Tracked"
                 value={peopleTracked}
                 color="text-green-500"
                 bgColor="bg-green-500/10"

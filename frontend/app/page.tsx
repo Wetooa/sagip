@@ -1,34 +1,241 @@
 "use client";
 
+import { MapView } from "@/components/MapView";
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { Legend } from "@/components/Legend";
+import {
+  ChevronLeft,
+  Droplets,
+  Waves,
+  Mountain,
+  Cloud,
+  Building2,
+  Eye,
+  EyeOff,
+} from "lucide-react";
+import Link from "next/link";
+import { CategoryTabs } from "@/components/CategoryTabs";
+import { DebugModalType, DebugModals } from "@/components/DebugModals";
+import DebugPanel, { DebugState } from "@/components/DebugPanel";
+
+export type HazardCategory =
+  | "flood"
+  | "storm-surge"
+  | "landslide"
+  | "rainfall"
+  | "buildings"
+  | "elevation"
+  | "facilities"
+  | "roads";
+
+export interface DriftPredictionPin {
+  latitude: number;
+  longitude: number;
+  radius: number;
+  timestamp: number;
+  expiresAt: number;
+}
+
+const hazardLayers: Array<{
+  id: HazardCategory;
+  label: string;
+  icon: React.ComponentType<{ className?: string }>;
+}> = [
+  { id: "flood", label: "Flood", icon: Droplets },
+  { id: "storm-surge", label: "Storm Surge", icon: Waves },
+  { id: "landslide", label: "Landslide", icon: Mountain },
+  { id: "rainfall", label: "Rainfall", icon: Cloud },
+  { id: "buildings", label: "Buildings", icon: Building2 },
+  { id: "elevation", label: "Elevation", icon: Mountain },
+  { id: "facilities", label: "Facilities", icon: Building2 },
+  { id: "roads", label: "Roads", icon: Waves },
+];
 
 export default function Home() {
-  const router = useRouter();
-  const [mounted, setMounted] = useState(false);
+  // Renamed from RootLayout to Home
+  const [selectedCategory, setSelectedCategory] =
+    useState<HazardCategory>("flood");
+  const [showLegend, setShowLegend] = useState(true);
 
+  // Debug state for all toggles
+  const [debug, setDebug] = useState<DebugState>({
+    duringTyphoon: false,
+    phoneDead: false,
+    internet: true,
+    bluetoothMesh: false,
+    loraDevice: false,
+  });
+  const [modal, setModal] = useState<DebugModalType>(null);
+
+  // User flow logic
   useEffect(() => {
-    setMounted(true);
-    
-    // Detect device type based on screen width
-    const isMobile = window.innerWidth < 768;
-    
-    // Redirect to appropriate route
-    if (isMobile) {
-      router.push("/mobile");
-    } else {
-      router.push("/desktop");
+    if (!debug.duringTyphoon) {
+      setModal(null);
+      return;
     }
-  }, [router]);
+    if (!debug.phoneDead) {
+      setModal("are-you-safe");
+    } else if (debug.loraDevice) {
+      setModal("lora-sos");
+    } else {
+      setModal("lora-drift");
+    }
+  }, [debug]);
 
-  // Show loading state while redirecting
-  if (!mounted) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-900">
-        <div className="text-white">Loading...</div>
+  // Handle modal transitions based on user flow
+  const handleStatus = (status: string) => {
+    if (!debug.phoneDead) {
+      // PHONE ALIVE FLOW
+      if (status === "yes") {
+        setModal(null); // Mark safe
+      } else if (status === "no") {
+        setModal("location-sent");
+      } else if (status === "bluetooth") {
+        // This is triggered by "Try Bluetooth Mesh" in Offline SOS modal
+        if (!debug.internet && !debug.bluetoothMesh) {
+          setModal("location-sent");
+        } else if (debug.bluetoothMesh) {
+          setModal("bluetooth-mesh");
+        } else {
+          setModal("drift-analysis");
+        }
+      } else if (status === "drift") {
+        setModal("drift-analysis");
+      }
+    } else {
+      // DEAD BATTERY FLOW
+      if (debug.loraDevice) {
+        setModal("lora-sos");
+      } else {
+        setModal("lora-drift");
+      }
+    }
+  };
+
+  // LoRa SOS button triggers LoRa modal
+  const handleLoraSOS = () => {
+    setModal("lora-sos");
+  };
+
+  return (
+    <div className="min-h-screen bg-gray-100 flex items-center justify-center p-4">
+      {/* Phone Frame */}
+      <div className="relative w-full max-w-sm">
+        {/* Phone Bezel */}
+        <div className="rounded-[3rem] border-12 border-[#1a1a1a] shadow-2xl overflow-hidden bg-black">
+          {/* Status Bar */}
+          <div className="bg-[#1a1a1a] text-white px-6 py-2 flex justify-between items-center text-xs font-semibold">
+            <span>9:41</span>
+            <div className="flex gap-1">
+              <span>📶</span>
+              <span>📡</span>
+              <span>🔋</span>
+            </div>
+          </div>
+
+          {/* Notch */}
+          <div className="absolute top-0 left-1/2 transform -translate-x-1/2 w-40 h-7 bg-[#1a1a1a] rounded-b-3xl z-10"></div>
+
+          {/* Screen Content */}
+          <div
+            className="bg-linear-to-br from-[#0f172a] via-[#1a1f35] to-[#111827] overflow-hidden relative flex flex-col"
+            style={{ height: "844px" }}
+          >
+            {/* Header */}
+            <header className="bg-linear-to-r from-[#8B0000]/20 to-[#6B1515]/20 backdrop-blur-md text-white px-4 py-3 shadow-lg shrink-0 border-b border-white/10 relative z-10">
+              <div className="flex items-center justify-between">
+                <Link
+                  href="/home"
+                  className="flex items-center gap-2 text-[#F5E6C8]/70 hover:text-[#F5E6C8] transition-all duration-300"
+                >
+                  <ChevronLeft className="w-5 h-5" />
+                  <span className="text-sm">Back</span>
+                </Link>
+                <span className="text-sm font-medium text-white">
+                  Hazard Map
+                </span>
+                <div className="w-16"></div>
+              </div>
+            </header>
+
+            {/* Map Content */}
+            <div className="flex-1 relative overflow-hidden">
+              <MapView category={selectedCategory} hideControls />
+
+              {showLegend && (
+                <Legend
+                  category={selectedCategory}
+                  onClose={() => setShowLegend(false)}
+                />
+              )}
+            </div>
+
+            {/* Bottom Navigation - Hazard Layer Selector */}
+            <div className="bg-linear-to-t from-[#0f172a]/98 to-[#1a1f35]/90 backdrop-blur-xl border-t border-white/10 px-2 py-3">
+              <div
+                className="flex gap-1.5 overflow-x-auto scrollbar-hide"
+                style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
+              >
+                {hazardLayers.map(({ id, label, icon: Icon }) => (
+                  <button
+                    key={id}
+                    onClick={() => setSelectedCategory(id)}
+                    className={`flex flex-col items-center gap-1 px-2 py-2 rounded-lg transition-all min-w-14 flex-1 ${
+                      selectedCategory === id
+                        ? "bg-linear-to-r from-[#8B0000] to-[#6B1515] text-white shadow-lg"
+                        : "bg-white/5 text-gray-400 border border-white/10 hover:border-white/20"
+                    }`}
+                  >
+                    <Icon className="w-4 h-4" />
+                    <div className="flex items-center gap-1">
+                      <span className="text-[8px] font-medium whitespace-nowrap">
+                        {label}
+                      </span>
+                      {selectedCategory === id && (
+                        <div
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setShowLegend(!showLegend);
+                          }}
+                          role="button"
+                          tabIndex={0}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter" || e.key === " ") {
+                              e.stopPropagation();
+                              setShowLegend(!showLegend);
+                            }
+                          }}
+                          className="p-0.5 rounded hover:bg-white/20 transition-all cursor-pointer"
+                          title={showLegend ? "Hide legend" : "Show legend"}
+                        >
+                          {showLegend ? (
+                            <Eye className="w-3 h-3" />
+                          ) : (
+                            <EyeOff className="w-3 h-3" />
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  </button>
+                ))}
+              </div>
+              <style>{`.scrollbar-hide::-webkit-scrollbar { display: none; }`}</style>
+            </div>
+          </div>
+
+          <CategoryTabs
+            selectedCategory={selectedCategory}
+            onCategoryChange={setSelectedCategory}
+          />
+          {/* Debug Panel Floating */}
+          <DebugPanel onChange={setDebug} onLoraSOS={handleLoraSOS} />
+          <DebugModals
+            modal={modal}
+            setModal={setModal}
+            onStatus={handleStatus}
+          />
+        </div>
       </div>
-    );
-  }
-
-  return null;
+    </div>
+  );
 }
