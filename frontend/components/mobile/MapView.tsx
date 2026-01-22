@@ -5,8 +5,7 @@ import maplibregl from "maplibre-gl";
 
 export type HazardCategory =
   | "flood"
-  | "storm-surge"
-  | "landslide";
+  | "storm-surge";
 import { TyphoonData } from "@/types/typhoon";
 import { toast } from "sonner";
 import {
@@ -33,9 +32,21 @@ import {
   useCensusData,
   useEvacuationCenters,
   useBarangaysByProvince,
+  useFloodHazardData,
+  useStormSurgeHazardData,
 } from "@/lib/api/geojson";
 import type { SicknessType } from "@/types/geojson";
 import { SICKNESS_COLORS } from "@/types/geojson";
+import {
+  getEvacuationCenterIcon,
+  getEvacuationCenterIconColor,
+} from "@/lib/utils/evacuation-icons";
+import {
+  loadEvacuationCenterIcons,
+  getEvacuationCenterIconId,
+} from "@/lib/utils/icon-images";
+import { useNearestEvacuationCenters } from "@/lib/api/routing";
+import type { EvacuationCenterRoute } from "@/lib/api/routing";
 
 interface MapViewProps {
   category: HazardCategory;
@@ -76,8 +87,20 @@ export function MapView({ category }: MapViewProps) {
     "Cebu"
   );
 
+  // Hazard map parameters
+  const [returnPeriod, setReturnPeriod] = useState<string>("5yr");
+  const [advisoryLevel, setAdvisoryLevel] = useState<string>("1");
+
   // Layer controls drawer state
   const [layerDrawerOpen, setLayerDrawerOpen] = useState(false);
+
+  // User location state
+  const [userLocation, setUserLocation] = useState<{
+    latitude: number;
+    longitude: number;
+  } | null>(null);
+  const markersRef = useRef<maplibregl.Marker[]>([]);
+  const routeLayersRef = useRef<string[]>([]);
 
   const activePulseFrame = useRef<number | null>(null);
 
@@ -85,6 +108,53 @@ export function MapView({ category }: MapViewProps) {
   const { data: censusData } = useCensusData();
   const { data: evacuationCentersData } = useEvacuationCenters(true);
   const { data: barangayData } = useBarangaysByProvince(selectedProvince);
+
+  // Fetch hazard map data
+  const { data: floodHazardData } = useFloodHazardData(
+    category === "flood" ? returnPeriod : "",
+    selectedProvince
+  );
+  const { data: stormSurgeHazardData } = useStormSurgeHazardData(
+    category === "storm-surge" ? advisoryLevel : "",
+    selectedProvince
+  );
+
+  // Fetch nearest evacuation centers when user location is available
+  const { data: nearestCentersData } = useNearestEvacuationCenters(
+    userLocation?.latitude ?? null,
+    userLocation?.longitude ?? null,
+    "driving",
+    true
+  );
+
+  // Get user location from localStorage
+  useEffect(() => {
+    const handleStorageChange = () => {
+      const storedLocation = localStorage.getItem("userLocation");
+      if (storedLocation) {
+        try {
+          const location = JSON.parse(storedLocation);
+          if (location.latitude && location.longitude) {
+            setUserLocation({
+              latitude: location.latitude,
+              longitude: location.longitude,
+            });
+          }
+        } catch (e) {
+          // Invalid stored location
+        }
+      }
+    };
+
+    handleStorageChange();
+    window.addEventListener("storage", handleStorageChange);
+    window.addEventListener("locationUpdated", handleStorageChange);
+
+    return () => {
+      window.removeEventListener("storage", handleStorageChange);
+      window.removeEventListener("locationUpdated", handleStorageChange);
+    };
+  }, []);
 
   // Initialize map
   useEffect(() => {
@@ -557,69 +627,170 @@ export function MapView({ category }: MapViewProps) {
     }
   }, [censusData, censusEnabled]);
 
-  // Add evacuation centers layer
+  // Add user location marker
+  useEffect(() => {
+    if (!map.current || !userLocation) {
+      // Remove existing user marker
+      markersRef.current.forEach((marker) => marker.remove());
+      markersRef.current = markersRef.current.filter((m) => {
+        const el = (m as any).getElement();
+        return el && !el.classList.contains("user-location-marker");
+      });
+      return;
+    }
+
+    const mapInstance = map.current;
+    if (!mapInstance.loaded()) {
+      mapInstance.once("load", () => {
+        // Re-run after map loads
+        const storedLocation = localStorage.getItem("userLocation");
+        if (storedLocation) {
+          try {
+            const location = JSON.parse(storedLocation);
+            if (location.latitude && location.longitude) {
+              setUserLocation({
+                latitude: location.latitude,
+                longitude: location.longitude,
+              });
+            }
+          } catch (e) {}
+        }
+      });
+      return;
+    }
+
+    // Remove existing user markers
+    markersRef.current
+      .filter((m) => {
+        const el = (m as any).getElement();
+        return el && el.classList.contains("user-location-marker");
+      })
+      .forEach((m) => m.remove());
+    markersRef.current = markersRef.current.filter((m) => {
+      const el = (m as any).getElement();
+      return !(el && el.classList.contains("user-location-marker"));
+    });
+
+    // Add user location marker
+    const userMarker = new maplibregl.Marker({
+      color: "#ef4444",
+      scale: 1.2,
+    })
+      .setLngLat([userLocation.longitude, userLocation.latitude])
+      .setPopup(
+        new maplibregl.Popup().setHTML(`
+          <div class="p-2">
+            <strong>Your Location</strong>
+          </div>
+        `)
+      )
+      .addTo(mapInstance);
+
+    const userMarkerEl = (userMarker as any).getElement();
+    if (userMarkerEl) {
+      userMarkerEl.classList.add("user-location-marker");
+    }
+    markersRef.current.push(userMarker);
+  }, [userLocation, map.current?.loaded()]);
+
+  // Add evacuation centers layer with custom icons using symbol layer
   useEffect(() => {
     if (!map.current || !evacuationCentersData || !evacuationCentersEnabled) {
+      // Remove evacuation centers layer and source
       if (map.current?.getLayer("evacuation-centers-layer")) {
-        map.current.setLayoutProperty(
-          "evacuation-centers-layer",
-          "visibility",
-          "none"
-        );
+        map.current.removeLayer("evacuation-centers-layer");
+      }
+      if (map.current?.getSource("evacuation-centers-source")) {
+        map.current.removeSource("evacuation-centers-source");
       }
       return;
     }
 
     const mapInstance = map.current;
 
-    const addEvacuationCentersLayer = () => {
+    const addEvacuationCentersLayer = async () => {
+      // Remove existing layer and source if they exist
+      if (mapInstance.getLayer("evacuation-centers-layer")) {
+        mapInstance.removeLayer("evacuation-centers-layer");
+      }
       if (mapInstance.getSource("evacuation-centers-source")) {
-        (
-          mapInstance.getSource(
-            "evacuation-centers-source"
-          ) as maplibregl.GeoJSONSource
-        ).setData(evacuationCentersData as any);
-        mapInstance.setLayoutProperty(
-          "evacuation-centers-layer",
-          "visibility",
-          "visible"
-        );
-        return;
+        mapInstance.removeSource("evacuation-centers-source");
       }
 
+      // Extract all unique evacuation center types and normalize them
+      const features = (evacuationCentersData as any).features || [];
+      const types = new Set<string>();
+      
+      // Transform features to add normalized icon-id property
+      const transformedData = {
+        ...evacuationCentersData,
+        features: features.map((feature: any) => {
+          const type = feature.properties?.type || "unknown";
+          const normalizedType = type.toLowerCase().trim();
+          types.add(normalizedType);
+          
+          return {
+            ...feature,
+            properties: {
+              ...feature.properties,
+              iconId: `evac-icon-${normalizedType}`,
+            },
+          };
+        }),
+      };
+      
+      // Always include "unknown" type for fallback
+      types.add("unknown");
+
+      // Load all icon images into MapLibre's cache
+      await loadEvacuationCenterIcons(mapInstance, Array.from(types));
+
+      // Add GeoJSON source with transformed data
       mapInstance.addSource("evacuation-centers-source", {
         type: "geojson",
-        data: evacuationCentersData as any,
+        data: transformedData as any,
       });
 
+      // Add symbol layer with icon images
+      // Use match expression to select icon based on type
       mapInstance.addLayer({
         id: "evacuation-centers-layer",
-        type: "circle",
+        type: "symbol",
         source: "evacuation-centers-source",
-        paint: {
-          "circle-radius": 8,
-          "circle-color": "#10b981",
-          "circle-stroke-color": "#ffffff",
-          "circle-stroke-width": 2,
-          "circle-opacity": 0.8,
+        layout: {
+          "icon-image": ["get", "iconId"],
+          "icon-size": 1,
+          "icon-allow-overlap": true,
+          "icon-ignore-placement": false,
         },
       });
 
+      // Add click handler for popups
       mapInstance.on("click", "evacuation-centers-layer", (e) => {
         if (!e.features || e.features.length === 0) return;
         const props = e.features[0].properties || {};
+        const centerType = props.type || "Unknown";
         new maplibregl.Popup()
           .setLngLat(e.lngLat)
-          .setHTML(
-            `<div>
+          .setHTML(`
+            <div class="p-2">
               <strong>${props.name || "Evacuation Center"}</strong><br/>
+              Type: ${centerType}<br/>
               Capacity: ${props.max_occupancy || "N/A"}<br/>
               Current: ${props.current_occupancy || "N/A"}<br/>
               Occupancy: ${props.occupancy_percentage || 0}%<br/>
               WiFi: ${props.has_wifi ? "Yes" : "No"}
-            </div>`
-          )
+            </div>
+          `)
           .addTo(mapInstance);
+      });
+
+      // Change cursor on hover
+      mapInstance.on("mouseenter", "evacuation-centers-layer", () => {
+        mapInstance.getCanvas().style.cursor = "pointer";
+      });
+      mapInstance.on("mouseleave", "evacuation-centers-layer", () => {
+        mapInstance.getCanvas().style.cursor = "";
       });
     };
 
@@ -629,6 +800,82 @@ export function MapView({ category }: MapViewProps) {
       mapInstance.once("load", addEvacuationCentersLayer);
     }
   }, [evacuationCentersData, evacuationCentersEnabled]);
+
+  // Add evacuation routes when user location and nearest centers are available
+  useEffect(() => {
+    if (!map.current || !userLocation || !nearestCentersData?.centers || !evacuationCentersEnabled) {
+      // Remove existing route layers
+      routeLayersRef.current.forEach((layerId) => {
+        if (map.current?.getLayer(layerId)) {
+          map.current.removeLayer(layerId);
+        }
+        if (map.current?.getSource(`route-source-${layerId.replace("route-", "")}`)) {
+          map.current.removeSource(`route-source-${layerId.replace("route-", "")}`);
+        }
+      });
+      routeLayersRef.current = [];
+      return;
+    }
+
+    const mapInstance = map.current;
+    if (!mapInstance.loaded()) return;
+
+    const ROUTE_COLORS = [
+      { color: "#3b82f6", name: "Blue" }, // 1st - Blue
+      { color: "#10b981", name: "Green" }, // 2nd - Green
+      { color: "#f97316", name: "Orange" }, // 3rd - Orange
+    ];
+
+    // Remove existing route layers
+    routeLayersRef.current.forEach((layerId) => {
+      if (mapInstance.getLayer(layerId)) {
+        mapInstance.removeLayer(layerId);
+      }
+      const sourceId = `route-source-${layerId.replace("route-", "")}`;
+      if (mapInstance.getSource(sourceId)) {
+        mapInstance.removeSource(sourceId);
+      }
+    });
+    routeLayersRef.current = [];
+
+    // Add routes for top 3 centers
+    const top3Centers = nearestCentersData.centers.slice(0, 3);
+    top3Centers.forEach((center: EvacuationCenterRoute, index: number) => {
+      const route = center.route?.routes?.[0];
+      if (!route || !route.geometry) return;
+
+      const routeId = `route-${center.rank}`;
+      const sourceId = `route-source-${center.rank}`;
+
+      mapInstance.addSource(sourceId, {
+        type: "geojson",
+        data: {
+          type: "Feature",
+          geometry: route.geometry,
+          properties: {
+            rank: center.rank,
+          },
+        },
+      });
+
+      mapInstance.addLayer({
+        id: routeId,
+        type: "line",
+        source: sourceId,
+        layout: {
+          "line-join": "round",
+          "line-cap": "round",
+        },
+        paint: {
+          "line-color": ROUTE_COLORS[index]?.color || "#6b7280",
+          "line-width": 4,
+          "line-opacity": 0.8,
+        },
+      });
+
+      routeLayersRef.current.push(routeId);
+    });
+  }, [userLocation, nearestCentersData, evacuationCentersEnabled, map.current?.loaded()]);
 
   // Add barangay layer with health risks
   useEffect(() => {
@@ -702,8 +949,50 @@ export function MapView({ category }: MapViewProps) {
       mapInstance.on("click", "barangay-layer", (e) => {
         if (!e.features || e.features.length === 0) return;
         const props = e.features[0].properties || {};
+        
+        // Access health_risks - it should be in the original properties
+        // MapLibre preserves the original properties when we spread them in processedData
         const healthRisks = props.health_risks || {};
         const sicknessRisk = healthRisks[selectedSickness] || {};
+
+        // Debug: Log to see what we're getting (can be removed in production)
+        if (process.env.NODE_ENV === 'development') {
+          console.log('Barangay click - props:', props);
+          console.log('Barangay click - health_risks:', healthRisks);
+          console.log('Barangay click - selectedSickness:', selectedSickness);
+          console.log('Barangay click - sicknessRisk:', sicknessRisk);
+        }
+
+        // Check if we have valid health risk data
+        // regression_score can be 0, so we need to check for undefined/null specifically
+        const hasRegressionScore = 
+          sicknessRisk.regression_score !== undefined && 
+          sicknessRisk.regression_score !== null;
+        const hasRiskLevel = 
+          sicknessRisk.risk_level !== undefined && 
+          sicknessRisk.risk_level !== null;
+        const hasHealthData = hasRegressionScore || hasRiskLevel;
+
+        // Build health risk section conditionally
+        const healthRiskSection = hasHealthData
+          ? `
+            <hr/>
+            <strong>Health Risk</strong><br/>
+            ${selectedSickness}: ${
+              hasRegressionScore
+                ? typeof sicknessRisk.regression_score === "number"
+                  ? sicknessRisk.regression_score.toFixed(2)
+                  : String(sicknessRisk.regression_score)
+                : "Not available"
+            }<br/>
+            Risk Level: ${hasRiskLevel ? sicknessRisk.risk_level : "Not available"}
+          `
+          : `
+            <hr/>
+            <em style="color: #6b7280; font-size: 0.9em;">
+              Health risk data not available for this barangay
+            </em>
+          `;
 
         new maplibregl.Popup()
           .setLngLat(e.lngLat)
@@ -711,10 +1000,7 @@ export function MapView({ category }: MapViewProps) {
             `<div>
               <strong>${props.NAME_3 || "Barangay"}</strong><br/>
               Province: ${props.PROVINCE || "N/A"}<br/>
-              <hr/>
-              <strong>Health Risk</strong><br/>
-              ${selectedSickness}: ${sicknessRisk.regression_score || "N/A"}<br/>
-              Risk Level: ${sicknessRisk.risk_level || "N/A"}
+              ${healthRiskSection}
             </div>`
           )
           .addTo(mapInstance);
@@ -727,6 +1013,168 @@ export function MapView({ category }: MapViewProps) {
       mapInstance.once("load", addBarangayLayer);
     }
   }, [barangayData, barangayEnabled, selectedSickness]);
+
+  // Add flood hazard map layer
+  useEffect(() => {
+    if (!map.current || !floodHazardData || category !== "flood") {
+      if (map.current?.getLayer("flood-hazard-layer")) {
+        map.current.setLayoutProperty("flood-hazard-layer", "visibility", "none");
+      }
+      return;
+    }
+
+    const mapInstance = map.current;
+
+    const addFloodLayer = () => {
+      const source = mapInstance.getSource("flood-hazard-source") as
+        | maplibregl.GeoJSONSource
+        | undefined;
+
+      if (source) {
+        source.setData(floodHazardData as any);
+        mapInstance.setLayoutProperty("flood-hazard-layer", "visibility", "visible");
+        return;
+      }
+
+      mapInstance.addSource("flood-hazard-source", {
+        type: "geojson",
+        data: floodHazardData as any,
+      });
+
+      mapInstance.addLayer({
+        id: "flood-hazard-layer",
+        type: "fill",
+        source: "flood-hazard-source",
+        paint: {
+          "fill-color": [
+            "case",
+            ["has", "DEPTH_M"],
+            [
+              "interpolate",
+              ["linear"],
+              ["to-number", ["get", "DEPTH_M"]],
+              0,
+              "#e3f2fd", // 0m - Very Low
+              0.5,
+              "#90caf9", // 0-0.5m - Low
+              1,
+              "#42a5f5", // 0.5-1m - Moderate
+              2,
+              "#1e88e5", // 1-2m - High
+              5,
+              "#1565c0", // 2-5m - Very High
+            ],
+            "#42a5f5", // Default blue color if DEPTH_M doesn't exist
+          ],
+          "fill-opacity": 0.6,
+          "fill-outline-color": "#0d47a1",
+        },
+      });
+
+      mapInstance.on("click", "flood-hazard-layer", (e) => {
+        if (!e.features || e.features.length === 0) return;
+        const props = e.features[0].properties || {};
+        const depth = props.DEPTH_M || props.Var || "N/A";
+        new maplibregl.Popup()
+          .setLngLat(e.lngLat)
+          .setHTML(
+            `<div>
+              <strong>Flood Hazard</strong><br/>
+              Depth: ${typeof depth === "number" ? depth.toFixed(2) : depth}m<br/>
+              Return Period: ${returnPeriod}
+            </div>`
+          )
+          .addTo(mapInstance);
+      });
+    };
+
+    if (mapInstance.loaded()) {
+      addFloodLayer();
+    } else {
+      mapInstance.once("load", addFloodLayer);
+    }
+  }, [floodHazardData, category, returnPeriod]);
+
+  // Add storm surge hazard map layer
+  useEffect(() => {
+    if (!map.current || !stormSurgeHazardData || category !== "storm-surge") {
+      if (map.current?.getLayer("storm-surge-hazard-layer")) {
+        map.current.setLayoutProperty("storm-surge-hazard-layer", "visibility", "none");
+      }
+      return;
+    }
+
+    const mapInstance = map.current;
+
+    const addStormSurgeLayer = () => {
+      const source = mapInstance.getSource("storm-surge-hazard-source") as
+        | maplibregl.GeoJSONSource
+        | undefined;
+
+      if (source) {
+        source.setData(stormSurgeHazardData as any);
+        mapInstance.setLayoutProperty("storm-surge-hazard-layer", "visibility", "visible");
+        return;
+      }
+
+      mapInstance.addSource("storm-surge-hazard-source", {
+        type: "geojson",
+        data: stormSurgeHazardData as any,
+      });
+
+      mapInstance.addLayer({
+        id: "storm-surge-hazard-layer",
+        type: "fill",
+        source: "storm-surge-hazard-source",
+        paint: {
+          "fill-color": [
+            "case",
+            ["has", "DEPTH_M"],
+            [
+              "interpolate",
+              ["linear"],
+              ["to-number", ["get", "DEPTH_M"]],
+              0,
+              "#fff3e0", // 0m - Very Low
+              1,
+              "#ffe0b2", // 0-1m - Low
+              2,
+              "#ffcc80", // 1-2m - Moderate
+              3,
+              "#ff9800", // 2-3m - High
+              5,
+              "#f57c00", // 3-5m - Very High
+            ],
+            "#ff9800", // Default orange color if DEPTH_M doesn't exist
+          ],
+          "fill-opacity": 0.6,
+          "fill-outline-color": "#e65100",
+        },
+      });
+
+      mapInstance.on("click", "storm-surge-hazard-layer", (e) => {
+        if (!e.features || e.features.length === 0) return;
+        const props = e.features[0].properties || {};
+        const depth = props.DEPTH_M || props.Var || "N/A";
+        new maplibregl.Popup()
+          .setLngLat(e.lngLat)
+          .setHTML(
+            `<div>
+              <strong>Storm Surge Hazard</strong><br/>
+              Depth: ${typeof depth === "number" ? depth.toFixed(2) : depth}m<br/>
+              Advisory Level: ${advisoryLevel}
+            </div>`
+          )
+          .addTo(mapInstance);
+      });
+    };
+
+    if (mapInstance.loaded()) {
+      addStormSurgeLayer();
+    } else {
+      mapInstance.once("load", addStormSurgeLayer);
+    }
+  }, [stormSurgeHazardData, category, advisoryLevel]);
 
   return (
     <div className="relative w-full h-full">
@@ -742,6 +1190,11 @@ export function MapView({ category }: MapViewProps) {
         onBarangayToggle={setBarangayEnabled}
         selectedSickness={selectedSickness}
         onSicknessChange={setSelectedSickness}
+        category={category}
+        returnPeriod={returnPeriod}
+        onReturnPeriodChange={setReturnPeriod}
+        advisoryLevel={advisoryLevel}
+        onAdvisoryLevelChange={setAdvisoryLevel}
         open={layerDrawerOpen}
         onOpenChange={setLayerDrawerOpen}
       />

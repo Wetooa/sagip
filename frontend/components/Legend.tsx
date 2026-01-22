@@ -30,16 +30,6 @@ const legendData: Record<
       { color: "#3B82F6", label: "0.5-1m surge" },
     ],
   },
-  landslide: {
-    title: "Landslide Warning",
-    items: [
-      { color: "#8B0000", label: "Critical" },
-      { color: "#FF4545", label: "High Risk" },
-      { color: "#FF8A3D", label: "Moderate Risk" },
-      { color: "#FFA500", label: "Low Risk" },
-      { color: "#F4E4C1", label: "Minimal Risk" },
-    ],
-  },
 };
 
 export function Legend({ category, onClose }: LegendProps) {

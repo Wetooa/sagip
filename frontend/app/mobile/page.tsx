@@ -8,8 +8,7 @@ import { Legend } from "@/components/Legend";
 
 export type HazardCategory =
   | "flood"
-  | "storm-surge"
-  | "landslide";
+  | "storm-surge";
 
 export default function MobilePage() {
   const [selectedCategory, setSelectedCategory] =

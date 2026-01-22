@@ -1,9 +1,10 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { User, Map, Ticket, Radio, MessageCircle, MapPin, Sparkles, Shield, TrendingUp, Navigation, Loader2 } from 'lucide-react';
+import { User, Map, Ticket, Radio, MessageCircle, MapPin, Sparkles, Shield, TrendingUp, Navigation, Loader2, Route } from 'lucide-react';
 import { useNearestEvacuationCenters } from '@/lib/api/routing';
 import { EvacuationRouteMap } from '@/components/EvacuationRouteMap';
+import { getEvacuationCenterIcon, getEvacuationCenterIconColor } from '@/lib/utils/evacuation-icons';
 
 type Tab = 'profile' | 'mapping' | 'tickets' | 'lora' | 'chatbot' | 'evacuation';
 
@@ -143,12 +144,175 @@ function NavTab({ icon: Icon, label, active, onClick }: NavTabProps) {
 
 // Tab Components
 function ProfileTab() {
+  const [userLocation, setUserLocation] = useState<{ latitude: number; longitude: number } | null>(null);
+  const [showNearestCenters, setShowNearestCenters] = useState(false);
+  const [vehicleType, setVehicleType] = useState<'driving' | 'walking' | 'cycling'>('driving');
+
+  // Get user location from localStorage
+  useEffect(() => {
+    const handleStorageChange = () => {
+      const storedLocation = localStorage.getItem('userLocation');
+      if (storedLocation) {
+        try {
+          const location = JSON.parse(storedLocation);
+          if (location.latitude && location.longitude) {
+            setUserLocation({ latitude: location.latitude, longitude: location.longitude });
+          }
+        } catch (e) {
+          // Invalid stored location
+        }
+      }
+    };
+
+    // Check on mount
+    handleStorageChange();
+
+    // Listen for changes
+    window.addEventListener('storage', handleStorageChange);
+    window.addEventListener('locationUpdated', handleStorageChange);
+
+    return () => {
+      window.removeEventListener('storage', handleStorageChange);
+      window.removeEventListener('locationUpdated', handleStorageChange);
+    };
+  }, []);
+
+  const { data, isLoading, error } = useNearestEvacuationCenters(
+    showNearestCenters && userLocation ? userLocation.latitude : null,
+    showNearestCenters && userLocation ? userLocation.longitude : null,
+    vehicleType,
+    true
+  );
+
+  const formatDistance = (meters: number | null): string => {
+    if (meters === null) return 'Unknown';
+    if (meters < 1000) return `${Math.round(meters)}m`;
+    return `${(meters / 1000).toFixed(1)} km`;
+  };
+
+  const formatDuration = (seconds: number | null): string => {
+    if (seconds === null) return 'Unknown';
+    const minutes = Math.round(seconds / 60);
+    if (minutes < 60) return `${minutes} min`;
+    const hours = Math.floor(minutes / 60);
+    const mins = minutes % 60;
+    return `${hours}h ${mins}m`;
+  };
+
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <h2 className="text-xl font-bold text-white">My Profile</h2>
         <Sparkles className="w-5 h-5 text-[#ff6b6b]" />
       </div>
+
+      {/* User Location Card */}
+      {userLocation && (
+        <div className="bg-gradient-to-br from-blue-500/20 to-blue-400/10 backdrop-blur-xl rounded-2xl p-4 shadow-lg border border-blue-500/20">
+          <div className="flex items-center gap-2 mb-2">
+            <MapPin className="w-5 h-5 text-blue-400" />
+            <h3 className="font-semibold text-white text-sm">Current Location</h3>
+          </div>
+          <div className="space-y-1 text-xs text-gray-300">
+            <p>Latitude: {userLocation.latitude.toFixed(6)}</p>
+            <p>Longitude: {userLocation.longitude.toFixed(6)}</p>
+          </div>
+        </div>
+      )}
+
+      {!userLocation && (
+        <div className="bg-gradient-to-br from-yellow-500/20 to-yellow-400/10 backdrop-blur-xl rounded-2xl p-4 shadow-lg border border-yellow-500/20">
+          <div className="flex items-center gap-2">
+            <MapPin className="w-5 h-5 text-yellow-400" />
+            <p className="text-sm text-yellow-300">No location set. Please set your location first.</p>
+          </div>
+        </div>
+      )}
+
+      {/* Find Nearest Evacuation Centers Button */}
+      {userLocation && (
+        <button
+          onClick={() => setShowNearestCenters(!showNearestCenters)}
+          className="w-full py-3 bg-gradient-to-r from-[#0ea5e9] to-[#06b6d4] text-white rounded-xl font-medium text-sm hover:shadow-lg hover:shadow-[#0ea5e9]/50 transition-all duration-300 flex items-center justify-center gap-2"
+        >
+          <Navigation className="w-4 h-4" />
+          {showNearestCenters ? 'Hide' : 'Find'} Nearest Evacuation Centers
+        </button>
+      )}
+
+      {/* Vehicle Type Selector */}
+      {showNearestCenters && userLocation && (
+        <div className="flex gap-2">
+          {(['driving', 'walking', 'cycling'] as const).map((type) => (
+            <button
+              key={type}
+              onClick={() => setVehicleType(type)}
+              className={`flex-1 py-2 px-3 rounded-lg text-xs font-medium transition-all ${
+                vehicleType === type
+                  ? 'bg-gradient-to-r from-[#0ea5e9] to-[#06b6d4] text-white shadow-lg'
+                  : 'bg-white/5 text-gray-400 hover:bg-white/10'
+              }`}
+            >
+              {type.charAt(0).toUpperCase() + type.slice(1)}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {/* Nearest Centers Results */}
+      {showNearestCenters && userLocation && (
+        <div className="space-y-3">
+          {isLoading && (
+            <div className="flex items-center justify-center py-4">
+              <Loader2 className="w-5 h-5 text-white animate-spin" />
+              <span className="ml-2 text-sm text-gray-300">Finding nearest centers...</span>
+            </div>
+          )}
+
+          {error && (
+            <div className="bg-red-500/10 border border-red-500/20 rounded-xl p-3 text-xs text-red-300">
+              Failed to load evacuation centers: {error instanceof Error ? error.message : 'Unknown error'}
+            </div>
+          )}
+
+          {data && data.centers && data.centers.slice(0, 3).map((center) => {
+            const IconComponent = getEvacuationCenterIcon(center.evacuation_center.type);
+            const iconColor = getEvacuationCenterIconColor(center.evacuation_center.type);
+            const centerType = center.evacuation_center.type || "Unknown";
+            
+            return (
+              <div
+                key={center.rank}
+                className="bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-xl rounded-xl p-3 shadow-lg border border-white/10"
+              >
+                <div className="flex items-start gap-2 mb-2">
+                  <span className="text-lg">
+                    {center.rank === 1 ? '🥇' : center.rank === 2 ? '🥈' : '🥉'}
+                  </span>
+                  <IconComponent 
+                    className="w-3 h-3" 
+                    style={{ color: iconColor }}
+                  />
+                  <div className="flex-1">
+                    <h3 className="font-semibold text-white text-sm">
+                      {center.evacuation_center.name || `Evacuation Center #${center.rank}`}
+                    </h3>
+                    <p className="text-xs text-gray-400 mt-1">
+                      Type: {centerType}
+                    </p>
+                    <p className="text-xs text-gray-400">
+                      {formatDistance(center.route_distance_meters)} away
+                    </p>
+                    <p className="text-xs font-semibold text-blue-400 mt-1">
+                      ETA: {formatDuration(center.route_duration_seconds)}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
 
       <div className="bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-xl rounded-2xl p-4 shadow-lg border border-white/10 hover:border-white/20 transition-all">
         <div className="flex items-center gap-4 mb-4">
@@ -342,6 +506,33 @@ function EvacuationPointsTab() {
   const [locationError, setLocationError] = useState<string | null>(null);
   const [vehicleType, setVehicleType] = useState<'driving' | 'walking' | 'cycling'>('driving');
   const [showMap, setShowMap] = useState(false);
+  const [selectedRouteCenter, setSelectedRouteCenter] = useState<number | null>(null);
+  
+  // Listen for localStorage changes (from debug page)
+  useEffect(() => {
+    const handleStorageChange = () => {
+      const storedLocation = localStorage.getItem('userLocation');
+      if (storedLocation) {
+        try {
+          const location = JSON.parse(storedLocation);
+          if (location.latitude && location.longitude) {
+            setUserLocation({ latitude: location.latitude, longitude: location.longitude });
+          }
+        } catch (e) {
+          // Invalid stored location
+        }
+      }
+    };
+
+    window.addEventListener('storage', handleStorageChange);
+    // Also listen for same-tab updates (custom event)
+    window.addEventListener('locationUpdated', handleStorageChange);
+
+    return () => {
+      window.removeEventListener('storage', handleStorageChange);
+      window.removeEventListener('locationUpdated', handleStorageChange);
+    };
+  }, []);
 
   // Get user location on mount
   useEffect(() => {
@@ -481,31 +672,79 @@ function EvacuationPointsTab() {
       {data && data.centers && (
         <>
           <div className="space-y-2">
-            {data.centers.map((center) => (
-              <div
-                key={center.rank}
-                className={`bg-gradient-to-r ${getRankColor(center.rank)} backdrop-blur-xl rounded-xl p-3 shadow-lg border transition-all`}
-              >
-                <div className="flex items-start justify-between mb-2">
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2 mb-1">
-                      <span className="text-lg">{getRankBadge(center.rank)}</span>
-                      <h3 className="font-semibold text-white text-sm">
-                        {center.evacuation_center.name || `Evacuation Center #${center.rank}`}
-                      </h3>
+            {data.centers.map((center) => {
+              const IconComponent = getEvacuationCenterIcon(center.evacuation_center.type);
+              const iconColor = getEvacuationCenterIconColor(center.evacuation_center.type);
+              const centerType = center.evacuation_center.type || "Unknown";
+              
+              return (
+                <div
+                  key={center.rank}
+                  className={`bg-gradient-to-r ${getRankColor(center.rank)} backdrop-blur-xl rounded-xl p-3 shadow-lg border transition-all`}
+                >
+                  <div className="flex items-start justify-between mb-2">
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className="text-lg">{getRankBadge(center.rank)}</span>
+                        <IconComponent 
+                          className="w-3 h-3" 
+                          style={{ color: iconColor }}
+                        />
+                        <h3 className="font-semibold text-white text-sm">
+                          {center.evacuation_center.name || `Evacuation Center #${center.rank}`}
+                        </h3>
+                      </div>
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className="text-xs text-gray-400">Type: {centerType}</span>
+                        <span className="text-xs text-gray-400">•</span>
+                        <span className="text-xs text-gray-400">{formatDistance(center.route_distance_meters)} away</span>
+                      </div>
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className="text-xs font-semibold text-blue-400">ETA: {formatDuration(center.route_duration_seconds)}</span>
+                      </div>
+                      {center.evacuation_center.capacity && (
+                        <p className="text-xs text-gray-500 mb-2">
+                          Capacity: {center.evacuation_center.capacity}
+                        </p>
+                      )}
+                      <button
+                        onClick={() => {
+                          if (selectedRouteCenter === center.rank) {
+                            setSelectedRouteCenter(null);
+                          } else {
+                            setSelectedRouteCenter(center.rank);
+                            // Show route details - already have distance/duration from the center data
+                          }
+                        }}
+                        className="mt-2 w-full py-2 px-3 bg-white/10 hover:bg-white/20 rounded-lg text-xs font-medium text-white transition-all flex items-center justify-center gap-2 border border-white/20"
+                      >
+                        <Route className="w-3 h-3" />
+                        {selectedRouteCenter === center.rank ? 'Hide' : 'View'} Route Details
+                      </button>
+                      {selectedRouteCenter === center.rank && (
+                        <div className="mt-2 p-2 bg-white/5 rounded-lg border border-white/10">
+                          <p className="text-xs text-white font-medium mb-2">Route Information</p>
+                          <div className="space-y-2 text-xs">
+                            <div className="flex items-center justify-between">
+                              <span className="text-gray-300">ETA:</span>
+                              <span className="text-blue-400 font-semibold">{formatDuration(center.route_duration_seconds)}</span>
+                            </div>
+                            <div className="flex items-center justify-between">
+                              <span className="text-gray-300">Distance:</span>
+                              <span className="text-gray-300">{formatDistance(center.route_distance_meters)}</span>
+                            </div>
+                            <div className="flex items-center justify-between">
+                              <span className="text-gray-300">Travel Mode:</span>
+                              <span className="text-gray-300">{vehicleType.charAt(0).toUpperCase() + vehicleType.slice(1)}</span>
+                            </div>
+                          </div>
+                        </div>
+                      )}
                     </div>
-                    <p className="text-xs text-gray-400">
-                      {formatDistance(center.route_distance_meters)} away • {formatDuration(center.route_duration_seconds)}
-                    </p>
-                    {center.evacuation_center.capacity && (
-                      <p className="text-xs text-gray-500 mt-1">
-                        Capacity: {center.evacuation_center.capacity}
-                      </p>
-                    )}
                   </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
 
           <button

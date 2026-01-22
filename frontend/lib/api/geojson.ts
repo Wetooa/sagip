@@ -47,6 +47,25 @@ export function useEvacuationCenters(cleaned: boolean = true) {
   });
 }
 
+export function useStormSurgeHazardData(
+  advisoryLevel: string,
+  province?: string | null
+) {
+  return useQuery({
+    queryKey: ["geojson", "storm-surge", advisoryLevel, province],
+    queryFn: () => {
+      const params = new URLSearchParams({ advisory_level: advisoryLevel });
+      if (province) {
+        params.append("province", province);
+      }
+      return fetchGeoJSON(
+        `${API_BASE_URL}/api/shared/geojson/storm-surge?${params.toString()}`
+      );
+    },
+    enabled: !!advisoryLevel,
+  });
+}
+
 export function useBarangaysByProvince(province: string | null) {
   return useQuery({
     queryKey: ["geojson", "barangays", province],

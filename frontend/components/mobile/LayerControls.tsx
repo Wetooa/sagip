@@ -17,6 +17,8 @@ import { Layers } from "lucide-react";
 import type { SicknessType } from "@/types/geojson";
 import { SICKNESS_COLORS, SICKNESS_NAMES } from "@/types/geojson";
 
+type HazardCategory = "flood" | "storm-surge";
+
 interface LayerControlsProps {
   // Layer toggles
   censusEnabled: boolean;
@@ -29,6 +31,13 @@ interface LayerControlsProps {
   // Health risk selection (only shown when barangay layer is enabled)
   selectedSickness: SicknessType;
   onSicknessChange: (sickness: SicknessType) => void;
+
+  // Category and hazard map parameters
+  category?: HazardCategory;
+  returnPeriod?: string;
+  onReturnPeriodChange?: (period: string) => void;
+  advisoryLevel?: string;
+  onAdvisoryLevelChange?: (level: string) => void;
 
   // Sheet state
   open?: boolean;
@@ -44,6 +53,11 @@ export function LayerControls({
   onBarangayToggle,
   selectedSickness,
   onSicknessChange,
+  category,
+  returnPeriod = "5yr",
+  onReturnPeriodChange,
+  advisoryLevel = "1",
+  onAdvisoryLevelChange,
   open,
   onOpenChange,
 }: LayerControlsProps) {
@@ -67,6 +81,52 @@ export function LayerControls({
           <SheetTitle className="text-lg">Map Layers</SheetTitle>
         </SheetHeader>
         <div className="space-y-4 mt-4">
+          {/* Return Period Selection for Flood */}
+          {category === "flood" && onReturnPeriodChange && (
+            <div>
+              <Label className="text-sm font-semibold mb-2 block">Return Period</Label>
+              <div className="space-y-2">
+                {["5yr", "25yr", "100yr"].map((period) => (
+                  <button
+                    key={period}
+                    onClick={() => onReturnPeriodChange(period)}
+                    className={`w-full text-left px-3 py-2 rounded-lg transition-all text-sm ${
+                      returnPeriod === period
+                        ? "bg-blue-600 text-white shadow-sm"
+                        : "bg-gray-50 text-gray-700 hover:bg-gray-100"
+                    }`}
+                  >
+                    {period}
+                  </button>
+                ))}
+              </div>
+              <Separator className="my-4" />
+            </div>
+          )}
+
+          {/* Advisory Level Selection for Storm Surge */}
+          {category === "storm-surge" && onAdvisoryLevelChange && (
+            <div>
+              <Label className="text-sm font-semibold mb-2 block">Advisory Level</Label>
+              <div className="space-y-2">
+                {["1", "2", "3", "4"].map((level) => (
+                  <button
+                    key={level}
+                    onClick={() => onAdvisoryLevelChange(level)}
+                    className={`w-full text-left px-3 py-2 rounded-lg transition-all text-sm ${
+                      advisoryLevel === level
+                        ? "bg-blue-600 text-white shadow-sm"
+                        : "bg-gray-50 text-gray-700 hover:bg-gray-100"
+                    }`}
+                  >
+                    Level {level}
+                  </button>
+                ))}
+              </div>
+              <Separator className="my-4" />
+            </div>
+          )}
+
           {/* Layer Toggles */}
           <div className="space-y-3">
             <div className="flex items-center space-x-2">

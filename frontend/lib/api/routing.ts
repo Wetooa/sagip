@@ -20,6 +20,7 @@ export interface EvacuationCenterRoute {
   evacuation_center: {
     id?: string;
     name?: string;
+    type?: string;
     capacity?: number;
     [key: string]: any;
   };

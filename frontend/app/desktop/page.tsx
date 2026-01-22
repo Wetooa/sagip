@@ -8,8 +8,7 @@ import LocationSearch from "@/components/desktop/LocationSearch";
 import { Legend } from "@/components/Legend";
 export type HazardCategory =
   | "flood"
-  | "storm-surge"
-  | "landslide";
+  | "storm-surge";
 import maplibregl from "maplibre-gl";
 import {
   Popover,
@@ -36,6 +35,10 @@ export default function DesktopPage() {
   // Health risk selection state
   const [selectedSickness, setSelectedSickness] =
     useState<SicknessType>("leptospirosis");
+
+  // Hazard map parameters
+  const [returnPeriod, setReturnPeriod] = useState<string>("5yr");
+  const [advisoryLevel, setAdvisoryLevel] = useState<string>("1");
 
   const handleMapReady = (map: maplibregl.Map | null) => {
     mapRef.current = map;
@@ -92,6 +95,10 @@ export default function DesktopPage() {
           onSicknessChange={setSelectedSickness}
           selectedCategory={selectedCategory}
           onCategoryChange={setSelectedCategory}
+          returnPeriod={returnPeriod}
+          onReturnPeriodChange={setReturnPeriod}
+          advisoryLevel={advisoryLevel}
+          onAdvisoryLevelChange={setAdvisoryLevel}
         />
 
         {/* Map Area */}
@@ -102,6 +109,8 @@ export default function DesktopPage() {
             evacuationCentersEnabled={evacuationCentersEnabled}
             barangayEnabled={barangayEnabled}
             selectedSickness={selectedSickness}
+            returnPeriod={returnPeriod}
+            advisoryLevel={advisoryLevel}
             onMapReady={handleMapReady}
           />
 

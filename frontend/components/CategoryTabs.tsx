@@ -1,7 +1,6 @@
 import {
   Droplets,
   Waves,
-  Mountain,
   Cloud,
   Building2,
   Layers,
@@ -18,7 +17,6 @@ interface CategoryTabsProps {
 const categories = [
   { id: "flood" as HazardCategory, label: "Flood", icon: Droplets },
   { id: "storm-surge" as HazardCategory, label: "Storm Surge", icon: Waves },
-  { id: "landslide" as HazardCategory, label: "Landslide", icon: Mountain },
 ];
 
 export function CategoryTabs({
