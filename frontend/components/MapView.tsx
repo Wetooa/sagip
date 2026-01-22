@@ -321,7 +321,7 @@ export function MapView({ category }: MapViewProps) {
     }
   };
 
-  const updateRescueSource = (mapInstance: maplibregl.Map) => {
+  const updateRescueSource = useCallback((mapInstance: maplibregl.Map) => {
     const source = mapInstance.getSource("rescue-pins") as
       | maplibregl.GeoJSONSource
       | undefined;
@@ -354,7 +354,7 @@ export function MapView({ category }: MapViewProps) {
       type: "FeatureCollection",
       features,
     });
-  };
+  }, [rescueFilters]);
 
   // Normalize storm data
   const normalizeStorm = (storm: TyphoonData): TyphoonData | null => {
@@ -378,90 +378,6 @@ export function MapView({ category }: MapViewProps) {
     if (validTrack.length === 0) return null;
 
     return { ...storm, track: validTrack };
-  };
-
-  useEffect(() => {
-    rescuePinsRef.current = rescuePins;
-  }, [rescuePins]);
-
-  const toRescuePin = (payload: any): RescuePin => ({
-    id: payload.id,
-    citizenId: payload.citizenId ?? payload.citizen_id ?? null,
-    name: payload.name ?? null,
-    contact: payload.contact ?? null,
-    householdSize: payload.householdSize ?? payload.household_size ?? null,
-    status: (payload.status || "open") as RescueStatus,
-    urgency: (payload.urgency || "normal") as RescueUrgency,
-    latitude: payload.latitude,
-    longitude: payload.longitude,
-    needs: {
-      water: Boolean(payload.needs?.water),
-      food: Boolean(payload.needs?.food),
-      medical: Boolean(payload.needs?.medical),
-      shelter: Boolean(payload.needs?.shelter),
-      evacuation: Boolean(payload.needs?.evacuation),
-      other: payload.needs?.other ?? null,
-    },
-    note: payload.note ?? null,
-    photoUrl: payload.photoUrl ?? payload.photo_url ?? null,
-    createdAt: payload.createdAt ?? payload.created_at,
-    updatedAt: payload.updatedAt ?? payload.updated_at,
-  });
-
-  const loadRescuePins = async () => {
-    setRescueLoading(true);
-    setRescueError(null);
-    try {
-      const response = await fetch("/api/rescue-requests?status=all", {
-        cache: "no-store",
-      });
-      if (!response.ok) {
-        throw new Error(`Failed to load rescues (${response.status})`);
-      }
-      const data = (await response.json()) as any[];
-      setRescuePins(data.map(toRescuePin));
-    } catch (error: unknown) {
-      console.error("Failed to load rescue pins", error);
-      setRescueError("Unable to load rescue pins");
-      toast.error("Unable to load rescue pins");
-    } finally {
-      setRescueLoading(false);
-    }
-  };
-
-  const updateRescueSource = (mapInstance: maplibregl.Map) => {
-    const source = mapInstance.getSource("rescue-pins") as
-      | maplibregl.GeoJSONSource
-      | undefined;
-    if (!source) return;
-
-    const filtered = rescuePinsRef.current.filter((pin) => {
-      const matchesUrgency =
-        rescueFilters.urgency === "all" ||
-        pin.urgency === rescueFilters.urgency;
-      const matchesStatus =
-        rescueFilters.status === "all" || pin.status === rescueFilters.status;
-      return matchesUrgency && matchesStatus;
-    });
-
-    const features = filtered.map((pin) => ({
-      type: "Feature" as const,
-      geometry: {
-        type: "Point" as const,
-        coordinates: [pin.longitude, pin.latitude],
-      },
-      properties: {
-        id: pin.id,
-        urgency: pin.urgency,
-        status: pin.status,
-        name: pin.name || "Rescue request",
-      },
-    }));
-
-    source.setData({
-      type: "FeatureCollection",
-      features,
-    });
   };
 
   // Add rescue layer and interactions
@@ -536,7 +452,7 @@ export function MapView({ category }: MapViewProps) {
     return () => {
       if (cleanup) cleanup();
     };
-  }, [handleRescueClickCallback]);
+  }, [handleRescueClickCallback, updateRescueSource]);
 
   useEffect(() => {
     if (!map.current) return;
