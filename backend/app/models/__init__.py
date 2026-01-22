@@ -1,6 +1,6 @@
 """Database models package."""
 from app.core.database import Base
-from app.models.citizen import Citizen, CensusData, VulnerabilityProfile
+from app.models.citizen import Citizen, CensusData, VulnerabilityProfile, FamilyMember
 from app.models.devices import Device, LoRaDevice
 from app.models.monitoring import WaterLevelReading
 from app.models.location import LocationHistory, PredictedLocation
@@ -15,6 +15,7 @@ __all__ = [
     "Citizen",
     "CensusData",
     "VulnerabilityProfile",
+    "FamilyMember",
     "Device",
     "LoRaDevice",
     "WaterLevelReading",
