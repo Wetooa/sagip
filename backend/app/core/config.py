@@ -4,7 +4,6 @@ from pydantic_settings import BaseSettings
 from pydantic import computed_field
 from typing import Optional
 
-
 class Settings(BaseSettings):
     """Application settings loaded from environment variables."""
 
@@ -22,6 +21,9 @@ class Settings(BaseSettings):
     # Database pool settings
     DB_POOL_SIZE: int = 5
     DB_MAX_OVERFLOW: int = 10
+
+    # Environment
+    ENV: Optional[str] = None
 
     @computed_field
     @property
@@ -65,6 +67,9 @@ class Settings(BaseSettings):
 
     # AI models settings
     AI_MODELS_PATH: str = "data/ai-models"
+
+    # OpenAI settings
+    OPENAI_API_KEY: Optional[str] = None
 
     class Config:
         env_file = ".env"

@@ -4,7 +4,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.core.config import settings
 from app.core.database import engine, Base
-from app.api import citizen, command, shared, debug
+from app.api import citizen, command, shared, debug, chatbot
 
 # Create database tables (in production, use Alembic migrations)
 # Base.metadata.create_all(bind=engine)
@@ -30,6 +30,7 @@ app.include_router(citizen.router, prefix=f"{settings.API_PREFIX}/citizen", tags
 app.include_router(command.router, prefix=f"{settings.API_PREFIX}/command", tags=["command"])
 app.include_router(shared.router, prefix=f"{settings.API_PREFIX}/shared", tags=["shared"])
 app.include_router(debug.router, prefix=f"{settings.API_PREFIX}/debug", tags=["debug"])
+app.include_router(chatbot.router, prefix=f"{settings.API_PREFIX}/chat", tags=["chat"])
 
 
 @app.get("/")
